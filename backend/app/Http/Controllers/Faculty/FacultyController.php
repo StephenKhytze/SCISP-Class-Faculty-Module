@@ -3,12 +3,44 @@
 namespace App\Http\Controllers\Faculty;
 
 use App\Http\Controllers\Controller;
+use App\Models\Faculty;
 use Illuminate\Http\Request;
 
 class FacultyController extends Controller
 {
-    // Group 5: Add faculty logic here
-    public function index() {
-        return response()->json(['message' => 'Faculty endpoint placeholder']);
+    public function index(Request $request)
+    {
+        $query = Faculty::query();
+
+        if ($search = $request->query('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('room', 'like', "%{$search}%")
+                    ->orWhere('position', 'like', "%{$search}%");
+            });
+        }
+
+        if ($department = $request->query('department')) {
+            $query->where('department', $department);
+        }
+
+        if ($position = $request->query('position')) {
+            $query->where('position', $position);
+        }
+
+        if ($specialization = $request->query('specialization')) {
+            $query->whereJsonContains('specializations', $specialization);
+        }
+
+        if ($status = $request->query('status')) {
+            $query->where('availability_status', $status);
+        }
+
+        return response()->json($query->orderBy('name')->get());
+    }
+
+    public function show(Faculty $faculty)
+    {
+        return response()->json($faculty);
     }
 }

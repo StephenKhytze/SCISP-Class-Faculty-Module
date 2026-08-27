@@ -76,6 +76,7 @@ Route::middleware('auth.jwt')->group(function () {
 
     Route::prefix('faculty')->group(function () {
         Route::get('/', [FacultyController::class, 'index']);
+        Route::get('/{faculty}', [FacultyController::class, 'show']);
         // Group 5: Add more faculty routes here
     });
 });
