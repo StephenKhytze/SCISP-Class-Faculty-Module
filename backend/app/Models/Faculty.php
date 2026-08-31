@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Faculty extends Model
 {
     protected $fillable = [
+        'user_id',
         'name',
         'position',
         'department',
@@ -25,4 +26,14 @@ class Faculty extends Model
     protected $casts = [
         'specializations' => 'array',
     ];
+
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'user_id', 'user_id');
+    }
+
+    public function bookings()
+    {
+        return $this->hasMany(ConsultationBooking::class);
+    }
 }

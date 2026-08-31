@@ -43,4 +43,15 @@ class FacultyController extends Controller
     {
         return response()->json($faculty);
     }
+
+    public function me(Request $request)
+    {
+        $faculty = Faculty::where('user_id', $request->user()->user_id)->first();
+
+        if (! $faculty) {
+            return response()->json(['message' => 'No faculty profile linked to this account.'], 404);
+        }
+
+        return response()->json($faculty);
+    }
 }

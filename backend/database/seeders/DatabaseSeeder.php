@@ -30,5 +30,7 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $this->call(FacultySeeder::class);
+        $this->call(ScheduleSeeder::class);
+        $this->call(ConsultationBookingSeeder::class);
     }
 }

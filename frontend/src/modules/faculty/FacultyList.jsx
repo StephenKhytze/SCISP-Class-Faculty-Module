@@ -3,7 +3,8 @@ import { Search, RotateCcw, Users, CalendarClock } from 'lucide-react';
 import api from '../../services/api';
 import FacultyCard from './components/FacultyCard';
 import FacultyProfileModal from './components/FacultyProfileModal';
-import { STATUS_LABELS, statusLabel } from './constants';
+import TeacherBookingsDashboard from './components/TeacherBookingsDashboard';
+import { STATUS_LABELS } from './constants';
 
 const EMPTY_FILTERS = {
   search: '',
@@ -20,7 +21,6 @@ export default function FacultyList() {
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [selectedFaculty, setSelectedFaculty] = useState(null);
-  const [bookings, setBookings] = useState([]);
 
   useEffect(() => {
     api
@@ -58,13 +58,7 @@ export default function FacultyList() {
     });
   }, [faculties, filters]);
 
-  const handleBook = (faculty) => {
-    setBookings((prev) => [
-      { id: `${faculty.id}-${Date.now()}`, faculty, requestedAt: new Date() },
-      ...prev,
-    ]);
-    setActiveTab('bookings');
-  };
+  const handleBook = () => setActiveTab('bookings');
 
   return (
     <div>
@@ -103,11 +97,6 @@ export default function FacultyList() {
         >
           <CalendarClock className="w-4 h-4" />
           My Consultation Bookings
-          {bookings.length > 0 && (
-            <span className="bg-amber-400 text-[#651020] text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
-              {bookings.length}
-            </span>
-          )}
         </button>
       </div>
 
@@ -196,7 +185,7 @@ export default function FacultyList() {
           )}
         </>
       ) : (
-        <BookingsPanel bookings={bookings} />
+        <TeacherBookingsDashboard />
       )}
 
       <FacultyProfileModal faculty={selectedFaculty} onClose={() => setSelectedFaculty(null)} />
@@ -220,46 +209,6 @@ function FilterSelect({ label, value, onChange, options, optionLabel, allLabel }
           </option>
         ))}
       </select>
-    </div>
-  );
-}
-
-function BookingsPanel({ bookings }) {
-  if (bookings.length === 0) {
-    return (
-      <div className="bg-white border border-gray-200 rounded-xl p-10 text-center">
-        <CalendarClock className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-        <p className="text-sm text-gray-500">
-          You haven't requested any consultation slots yet. Click "Book" on a faculty card to get started.
-        </p>
-        <p className="text-xs text-gray-400 mt-2">Consultation booking is a preview feature — requests are not yet sent to faculty.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      {bookings.map(({ id, faculty, requestedAt }) => (
-        <div key={id} className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between">
-          <div>
-            <p className="font-semibold text-gray-900">{faculty.name}</p>
-            <p className="text-xs text-gray-500">
-              {faculty.department} &middot; {statusLabel(faculty.availability_status, faculty.status_detail)}
-            </p>
-            {faculty.office_hours && (
-              <p className="text-xs text-gray-500">Office Hours: {faculty.office_hours}</p>
-            )}
-          </div>
-          <div className="text-right">
-            <span className="text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 rounded-full">
-              Pending
-            </span>
-            <p className="text-[11px] text-gray-400 mt-1">
-              Requested {requestedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </p>
-          </div>
-        </div>
-      ))}
     </div>
   );
 }

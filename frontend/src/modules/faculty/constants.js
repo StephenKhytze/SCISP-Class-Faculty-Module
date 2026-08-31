@@ -26,3 +26,24 @@ export function statusLabel(status, detail) {
   const base = STATUS_LABELS[status] || status;
   return detail ? `${base} (${detail})` : base;
 }
+
+export const BOOKING_STATUS_LABELS = {
+  pending: 'Pending',
+  approved: 'Approved',
+  declined: 'Declined',
+  completed: 'Completed',
+};
+
+export const BOOKING_STATUS_STYLES = {
+  pending: 'bg-amber-50 text-amber-700 border-amber-200',
+  approved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  declined: 'bg-rose-50 text-rose-700 border-rose-200',
+  completed: 'bg-sky-50 text-sky-700 border-sky-200',
+};
+
+export const BOOKING_CHIP_STYLES = {
+  pending: 'bg-amber-100 text-amber-800',
+  approved: 'bg-emerald-100 text-emerald-800',
+  declined: 'bg-rose-100 text-rose-800',
+  completed: 'bg-sky-100 text-sky-800',
+};
