@@ -7,9 +7,8 @@ import { DAYS, TIME_SLOTS, currentDayName, currentTimeHHMM } from './constants';
 
 const EMPTY_FILTERS = {
   search: '',
-  course: '',
-  yearLevel: '',
-  semester: '',
+  level: '',
+  year: '',
   dayRange: 'weekdays',
 };
 
@@ -28,17 +27,16 @@ export default function ScheduleView() {
       .finally(() => setLoading(false));
   }, []);
 
-  const courses = useMemo(() => [...new Set(schedules.map((s) => s.course))].sort(), [schedules]);
-  const yearLevels = useMemo(() => [...new Set(schedules.map((s) => s.year_level))].sort(), [schedules]);
-  const semesters = useMemo(() => [...new Set(schedules.map((s) => s.semester))].sort(), [schedules]);
+  const levels = useMemo(() => [...new Set(schedules.map((s) => s.level))].sort(), [schedules]);
+  const years = useMemo(() => [...new Set(schedules.map((s) => s.year))].sort(), [schedules]);
 
   const schedulesWithConflicts = useMemo(() => {
     return schedules.map((entry) => {
       const hasConflict = schedules.some(
         (other) =>
-          other.id !== entry.id &&
+          other.schedule_id !== entry.schedule_id &&
           other.room === entry.room &&
-          other.day_of_week === entry.day_of_week &&
+          other.day === entry.day &&
           entry.start_time < other.end_time &&
           entry.end_time > other.start_time
       );
@@ -49,9 +47,8 @@ export default function ScheduleView() {
   const filteredSchedules = useMemo(() => {
     const keyword = filters.search.trim().toLowerCase();
     return schedulesWithConflicts.filter((s) => {
-      if (filters.course && s.course !== filters.course) return false;
-      if (filters.yearLevel && s.year_level !== filters.yearLevel) return false;
-      if (filters.semester && s.semester !== filters.semester) return false;
+      if (filters.level && s.level !== filters.level) return false;
+      if (filters.year && s.year !== filters.year) return false;
       if (keyword) {
         const haystack = `${s.subject_code} ${s.subject_name} ${s.room}`.toLowerCase();
         if (!haystack.includes(keyword)) return false;
@@ -66,12 +63,12 @@ export default function ScheduleView() {
     const day = currentDayName();
     const time = currentTimeHHMM();
     if (!day) return null;
-    return schedules.find((s) => s.day_of_week === day && s.start_time <= time && s.end_time > time) || null;
+    return schedules.find((s) => s.day === day && s.start_time <= time && s.end_time > time) || null;
   }, [schedules]);
 
   const entriesFor = (day, slot) =>
     filteredSchedules.filter(
-      (s) => s.day_of_week === day && s.start_time < slot.end && s.end_time > slot.start
+      (s) => s.day === day && s.start_time < slot.end && s.end_time > slot.start
     );
 
   return (
@@ -125,7 +122,7 @@ export default function ScheduleView() {
       )}
 
       <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="text-[11px] font-semibold text-gray-400 uppercase">Search Subject / Room</label>
             <div className="relative mt-1">
@@ -139,9 +136,8 @@ export default function ScheduleView() {
             </div>
           </div>
 
-          <FilterSelect label="Course" value={filters.course} onChange={(v) => setFilters((f) => ({ ...f, course: v }))} options={courses} allLabel="All Courses" />
-          <FilterSelect label="Year Level" value={filters.yearLevel} onChange={(v) => setFilters((f) => ({ ...f, yearLevel: v }))} options={yearLevels} allLabel="All Year Levels" />
-          <FilterSelect label="Semester" value={filters.semester} onChange={(v) => setFilters((f) => ({ ...f, semester: v }))} options={semesters} allLabel="All Semesters" />
+          <FilterSelect label="Course" value={filters.level} onChange={(v) => setFilters((f) => ({ ...f, level: v }))} options={levels} allLabel="All Courses" />
+          <FilterSelect label="Year Level" value={filters.year} onChange={(v) => setFilters((f) => ({ ...f, year: v }))} options={years} allLabel="All Year Levels" />
 
           <div>
             <label className="text-[11px] font-semibold text-gray-400 uppercase">Filter Day</label>

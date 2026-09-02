@@ -6,19 +6,26 @@ use Illuminate\Database\Eloquent\Model;
 
 class Faculty extends Model
 {
+    protected $table = 'faculty';
+    protected $primaryKey = 'faculty_id';
+
+    protected $appends = ['name'];
+
     protected $fillable = [
         'user_id',
-        'name',
-        'position',
+        'first_name',
+        'middle_name',
+        'last_name',
+        'faculty_image',
         'department',
+        'email_address',
+        'position',
         'college',
         'building',
         'room',
         'local_ext',
-        'email',
         'office_hours',
         'specializations',
-        'photo_url',
         'availability_status',
         'status_detail',
     ];
@@ -27,13 +34,33 @@ class Faculty extends Model
         'specializations' => 'array',
     ];
 
+    public function getNameAttribute(): string
+    {
+        return implode(' ', array_filter([$this->first_name, $this->middle_name, $this->last_name]));
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id', 'user_id');
     }
 
-    public function bookings()
+    public function schedules()
     {
-        return $this->hasMany(ConsultationBooking::class);
+        return $this->hasMany(Schedule::class, 'faculty_id', 'faculty_id');
+    }
+
+    public function consultations()
+    {
+        return $this->hasMany(Consultation::class, 'faculty_id', 'faculty_id');
+    }
+
+    public function consultationHours()
+    {
+        return $this->hasMany(FacultyConsultationHour::class, 'faculty_id', 'faculty_id');
+    }
+
+    public function availability()
+    {
+        return $this->hasMany(FacultyAvailability::class, 'faculty_id', 'faculty_id');
     }
 }

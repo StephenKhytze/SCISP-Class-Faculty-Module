@@ -16,27 +16,27 @@ export default function BookingRequestsQueue({ bookings, onUpdateStatus }) {
   return (
     <div className="space-y-3">
       {pending.map((booking) => (
-        <div key={booking.id} className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between gap-4">
+        <div key={booking.consultation_id} className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between gap-4">
           <div>
             <p className="font-semibold text-gray-900">{booking.student_name}</p>
             <p className="text-xs text-gray-500">
-              {new Date(booking.booking_date).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+              {new Date(booking.consultation_date).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
             </p>
-            <p className="text-xs text-gray-500">{booking.start_time} - {booking.end_time}</p>
+            <p className="text-xs text-gray-500">{booking.consultation_time}</p>
             <span className={`inline-block mt-1 text-[11px] font-medium px-2 py-0.5 rounded-full border ${BOOKING_STATUS_STYLES[booking.status]}`}>
               {BOOKING_STATUS_LABELS[booking.status]}
             </span>
           </div>
           <div className="flex gap-2 shrink-0">
             <button
-              onClick={() => onUpdateStatus(booking.id, 'approved')}
+              onClick={() => onUpdateStatus(booking.consultation_id, 'approved')}
               className="flex items-center gap-1.5 bg-emerald-600 text-white text-sm font-semibold px-3 py-2 rounded-lg hover:bg-emerald-700 transition-colors"
             >
               <CheckCircle2 className="w-4 h-4" />
               Approve
             </button>
             <button
-              onClick={() => onUpdateStatus(booking.id, 'declined')}
+              onClick={() => onUpdateStatus(booking.consultation_id, 'declined')}
               className="flex items-center gap-1.5 border border-rose-300 text-rose-700 text-sm font-semibold px-3 py-2 rounded-lg hover:bg-rose-50 transition-colors"
             >
               <XCircle className="w-4 h-4" />

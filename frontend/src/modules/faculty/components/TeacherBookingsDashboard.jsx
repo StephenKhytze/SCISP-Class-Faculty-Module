@@ -20,17 +20,17 @@ export default function TeacherBookingsDashboard() {
       .catch(() => api.get('/faculty').then((res) => res.data.find((f) => f.user_id) ?? null))
       .then((facultyData) => {
         setFaculty(facultyData);
-        return facultyData ? api.get(`/faculty/${facultyData.id}/bookings`) : null;
+        return facultyData ? api.get(`/faculty/${facultyData.faculty_id}/consultations`) : null;
       })
       .then((res) => res && setBookings(res.data))
       .catch(() => setError('Unable to load consultation bookings.'))
       .finally(() => setLoading(false));
   }, []);
 
-  const updateStatus = (bookingId, status) => {
+  const updateStatus = (consultationId, status) => {
     api
-      .patch(`/bookings/${bookingId}`, { status })
-      .then((res) => setBookings((prev) => prev.map((b) => (b.id === bookingId ? res.data : b))))
+      .patch(`/consultations/${consultationId}`, { status })
+      .then((res) => setBookings((prev) => prev.map((b) => (b.consultation_id === consultationId ? res.data : b))))
       .catch(() => setError('Unable to update that booking.'));
   };
 

@@ -7,7 +7,7 @@ export default function ScheduleCell({ entries, onSelectInstructor }) {
     <div className="flex flex-col gap-1.5">
       {entries.map((entry) => (
         <button
-          key={entry.id}
+          key={entry.schedule_id}
           onClick={() => entry.faculty && onSelectInstructor(entry.faculty)}
           className={`text-left rounded-lg p-2 text-xs transition-colors ${
             entry.hasConflict

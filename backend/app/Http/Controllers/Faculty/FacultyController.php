@@ -14,7 +14,8 @@ class FacultyController extends Controller
 
         if ($search = $request->query('search')) {
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
+                $q->where('first_name', 'like', "%{$search}%")
+                    ->orWhere('last_name', 'like', "%{$search}%")
                     ->orWhere('room', 'like', "%{$search}%")
                     ->orWhere('position', 'like', "%{$search}%");
             });
@@ -36,7 +37,7 @@ class FacultyController extends Controller
             $query->where('availability_status', $status);
         }
 
-        return response()->json($query->orderBy('name')->get());
+        return response()->json($query->orderBy('last_name')->get());
     }
 
     public function show(Faculty $faculty)

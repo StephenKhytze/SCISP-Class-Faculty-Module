@@ -23,7 +23,7 @@ export default function BookingMonthlyCalendar({ bookings, statusFilter, onStatu
   const bookingsByDate = useMemo(() => {
     const map = {};
     for (const booking of filteredBookings) {
-      (map[booking.booking_date] ??= []).push(booking);
+      (map[booking.consultation_date] ??= []).push(booking);
     }
     return map;
   }, [filteredBookings]);
@@ -120,9 +120,9 @@ export default function BookingMonthlyCalendar({ bookings, statusFilter, onStatu
                 </div>
                 <div className="space-y-1">
                   {entries.slice(0, 2).map((entry) => (
-                    <div key={entry.id} className={`text-[10px] font-semibold px-1.5 py-1 rounded truncate ${BOOKING_CHIP_STYLES[entry.status]}`}>
+                    <div key={entry.consultation_id} className={`text-[10px] font-semibold px-1.5 py-1 rounded truncate ${BOOKING_CHIP_STYLES[entry.status]}`}>
                       {entry.student_name}
-                      <div className="font-normal opacity-80">{entry.start_time} - {entry.end_time}</div>
+                      <div className="font-normal opacity-80">{entry.consultation_time}</div>
                     </div>
                   ))}
                 </div>
@@ -146,10 +146,10 @@ export default function BookingMonthlyCalendar({ bookings, statusFilter, onStatu
 
           <div className="space-y-2">
             {selectedBookings.map((booking) => (
-              <div key={booking.id} className="flex items-center justify-between border border-gray-100 rounded-lg p-3">
+              <div key={booking.consultation_id} className="flex items-center justify-between border border-gray-100 rounded-lg p-3">
                 <div>
                   <p className="text-sm font-semibold text-gray-900">{booking.student_name}</p>
-                  <p className="text-xs text-gray-500">{booking.start_time} - {booking.end_time}</p>
+                  <p className="text-xs text-gray-500">{booking.consultation_time}</p>
                 </div>
                 <span className={`text-[11px] font-medium px-2.5 py-1 rounded-full border ${BOOKING_STATUS_STYLES[booking.status]}`}>
                   {BOOKING_STATUS_LABELS[booking.status]}

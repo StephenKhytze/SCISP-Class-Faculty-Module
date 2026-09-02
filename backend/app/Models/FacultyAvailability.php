@@ -4,27 +4,26 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class ConsultationBooking extends Model
+class FacultyAvailability extends Model
 {
+    protected $table = 'faculty_availability';
+    protected $primaryKey = 'availability_id';
+
     protected $fillable = [
         'faculty_id',
-        'student_name',
-        'student_email',
-        'booking_date',
+        'day',
         'start_time',
         'end_time',
         'status',
-        'notes',
     ];
 
     protected $casts = [
-        'booking_date' => 'date:Y-m-d',
         'start_time' => 'datetime:H:i',
         'end_time' => 'datetime:H:i',
     ];
 
     public function faculty()
     {
-        return $this->belongsTo(Faculty::class);
+        return $this->belongsTo(Faculty::class, 'faculty_id', 'faculty_id');
     }
 }

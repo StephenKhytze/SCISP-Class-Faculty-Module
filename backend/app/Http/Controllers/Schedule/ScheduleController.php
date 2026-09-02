@@ -3,37 +3,35 @@
 namespace App\Http\Controllers\Schedule;
 
 use App\Http\Controllers\Controller;
-use App\Models\ClassSchedule;
+use App\Models\Schedule;
 use Illuminate\Http\Request;
 
 class ScheduleController extends Controller
 {
     public function index(Request $request)
     {
-        $query = ClassSchedule::with('faculty')->orderBy('start_time');
+        $query = Schedule::with(['subject', 'faculty'])->orderBy('start_time');
 
         if ($search = $request->query('search')) {
             $query->where(function ($q) use ($search) {
-                $q->where('subject_code', 'like', "%{$search}%")
-                    ->orWhere('subject_name', 'like', "%{$search}%")
-                    ->orWhere('room', 'like', "%{$search}%");
+                $q->where('room', 'like', "%{$search}%")
+                    ->orWhereHas('subject', function ($sq) use ($search) {
+                        $sq->where('subject_code', 'like', "%{$search}%")
+                            ->orWhere('subject_name', 'like', "%{$search}%");
+                    });
             });
         }
 
-        if ($course = $request->query('course')) {
-            $query->where('course', $course);
+        if ($level = $request->query('level')) {
+            $query->where('level', $level);
         }
 
-        if ($yearLevel = $request->query('year_level')) {
-            $query->where('year_level', $yearLevel);
-        }
-
-        if ($semester = $request->query('semester')) {
-            $query->where('semester', $semester);
+        if ($year = $request->query('year')) {
+            $query->where('year', $year);
         }
 
         if ($day = $request->query('day')) {
-            $query->where('day_of_week', $day);
+            $query->where('day', $day);
         }
 
         return response()->json($query->get());

@@ -10,7 +10,7 @@ use App\Http\Controllers\Announcements\AnnouncementController;
 use App\Http\Controllers\Library\LibraryController;
 use App\Http\Controllers\StudentInfo\StudentController;
 use App\Http\Controllers\Faculty\FacultyController;
-use App\Http\Controllers\Faculty\ConsultationBookingController;
+use App\Http\Controllers\Faculty\ConsultationController;
 
 Route::get('/test', function () {
     return response()->json([
@@ -79,9 +79,9 @@ Route::middleware('auth.jwt')->group(function () {
         Route::get('/', [FacultyController::class, 'index']);
         Route::get('/me', [FacultyController::class, 'me']);
         Route::get('/{faculty}', [FacultyController::class, 'show']);
-        Route::get('/{faculty}/bookings', [ConsultationBookingController::class, 'index']);
+        Route::get('/{faculty}/consultations', [ConsultationController::class, 'index']);
         // Group 5: Add more faculty routes here
     });
 
-    Route::patch('/bookings/{booking}', [ConsultationBookingController::class, 'updateStatus']);
+    Route::patch('/consultations/{consultation}', [ConsultationController::class, 'updateStatus']);
 });

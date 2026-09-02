@@ -21,8 +21,8 @@ export default function FacultyProfileModal({ faculty, onClose }) {
         </button>
 
         <div className="flex items-center gap-4 mb-5">
-          {faculty.photo_url ? (
-            <img src={faculty.photo_url} alt={faculty.name} className="w-20 h-20 rounded-full object-cover" />
+          {faculty.faculty_image ? (
+            <img src={faculty.faculty_image} alt={faculty.name} className="w-20 h-20 rounded-full object-cover" />
           ) : (
             <div className="w-20 h-20 rounded-full bg-[#80172B]/10 flex items-center justify-center">
               <UserRound className="w-10 h-10 text-[#80172B]" />
@@ -50,7 +50,7 @@ export default function FacultyProfileModal({ faculty, onClose }) {
           </div>
           <div className="flex items-center gap-2">
             <Mail className="w-4 h-4 text-gray-400 shrink-0" />
-            {faculty.email}
+            {faculty.email_address}
           </div>
           {faculty.office_hours && (
             <div className="flex items-center gap-2">

@@ -173,7 +173,7 @@ export default function FacultyList() {
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                   {filteredFaculties.map((faculty) => (
                     <FacultyCard
-                      key={faculty.id}
+                      key={faculty.faculty_id}
                       faculty={faculty}
                       onViewProfile={setSelectedFaculty}
                       onBook={handleBook}

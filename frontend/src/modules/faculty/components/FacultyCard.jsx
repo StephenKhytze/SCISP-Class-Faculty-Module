@@ -7,12 +7,10 @@ export default function FacultyCard({ faculty, onViewProfile, onBook }) {
 
   const copyEmail = async () => {
     try {
-      await navigator.clipboard.writeText(faculty.email);
+      await navigator.clipboard.writeText(faculty.email_address);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // clipboard unavailable, ignore
-    }
+    } catch {}
   };
 
   return (
@@ -30,8 +28,8 @@ export default function FacultyCard({ faculty, onViewProfile, onBook }) {
       </div>
 
       <div className="flex items-center gap-3 mb-4">
-        {faculty.photo_url ? (
-          <img src={faculty.photo_url} alt={faculty.name} className="w-14 h-14 rounded-full object-cover" />
+        {faculty.faculty_image ? (
+          <img src={faculty.faculty_image} alt={faculty.name} className="w-14 h-14 rounded-full object-cover" />
         ) : (
           <div className="w-14 h-14 rounded-full bg-[#80172B]/10 flex items-center justify-center">
             <UserRound className="w-7 h-7 text-[#80172B]" />
@@ -54,7 +52,7 @@ export default function FacultyCard({ faculty, onViewProfile, onBook }) {
         </div>
         <div className="flex items-center gap-2">
           <Mail className="w-4 h-4 text-gray-400 shrink-0" />
-          <span className="truncate">{faculty.email}</span>
+          <span className="truncate">{faculty.email_address}</span>
           <button
             onClick={copyEmail}
             className="text-gray-400 hover:text-[#80172B] transition-colors shrink-0"
