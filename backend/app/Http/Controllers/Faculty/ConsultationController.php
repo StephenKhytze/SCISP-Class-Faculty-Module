@@ -24,6 +24,25 @@ class ConsultationController extends Controller
         return response()->json($query->get());
     }
 
+    public function store(Request $request, Faculty $faculty)
+    {
+        $data = $request->validate([
+            'consultation_date' => 'required|date',
+            'consultation_time' => 'required',
+            'student_name' => 'nullable|string',
+        ]);
+
+        $consultation = $faculty->consultations()->create([
+            'student_id' => $request->user()->user_id,
+            'student_name' => $data['student_name'] ?? $request->user()->username,
+            'consultation_date' => $data['consultation_date'],
+            'consultation_time' => $data['consultation_time'],
+            'status' => 'pending',
+        ]);
+
+        return response()->json($consultation, 201);
+    }
+
     public function updateStatus(Request $request, Consultation $consultation)
     {
         $data = $request->validate([

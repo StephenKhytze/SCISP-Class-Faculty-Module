@@ -19,6 +19,16 @@ export default function ScheduleView() {
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [selectedInstructor, setSelectedInstructor] = useState(null);
 
+  const currentUser = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem('user'));
+    } catch {
+      return null;
+    }
+  }, []);
+  // Students only belong to one course, so the course filter is faculty/admin-only.
+  const canFilterByCourse = currentUser?.role !== 'Student';
+
   useEffect(() => {
     api
       .get('/schedule')
@@ -122,7 +132,7 @@ export default function ScheduleView() {
       )}
 
       <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className={`grid grid-cols-1 gap-4 ${canFilterByCourse ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
           <div>
             <label className="text-[11px] font-semibold text-gray-400 uppercase">Search Subject / Room</label>
             <div className="relative mt-1">
@@ -136,7 +146,9 @@ export default function ScheduleView() {
             </div>
           </div>
 
-          <FilterSelect label="Course" value={filters.level} onChange={(v) => setFilters((f) => ({ ...f, level: v }))} options={levels} allLabel="All Courses" />
+          {canFilterByCourse && (
+            <FilterSelect label="Course" value={filters.level} onChange={(v) => setFilters((f) => ({ ...f, level: v }))} options={levels} allLabel="All Courses" />
+          )}
           <FilterSelect label="Year Level" value={filters.year} onChange={(v) => setFilters((f) => ({ ...f, year: v }))} options={years} allLabel="All Year Levels" />
 
           <div>
@@ -162,12 +174,12 @@ export default function ScheduleView() {
             <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Weekly Timetable Calendar Grid</span>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
+            <table className="w-full border-collapse table-fixed">
               <thead>
                 <tr className="border-b border-gray-200">
-                  <th className="text-left text-xs font-bold text-gray-500 uppercase p-3 w-32">Time</th>
+                  <th className="text-left text-xs font-bold text-gray-500 uppercase p-3 w-28">Time</th>
                   {visibleDays.map((day) => (
-                    <th key={day} className="text-left text-xs font-bold text-gray-500 uppercase p-3 min-w-[160px]">
+                    <th key={day} className="text-left text-xs font-bold text-gray-500 uppercase p-3 w-[160px]">
                       {day}
                     </th>
                   ))}
@@ -176,9 +188,9 @@ export default function ScheduleView() {
               <tbody>
                 {TIME_SLOTS.map((slot) => (
                   <tr key={slot.label} className="border-b border-gray-100 last:border-b-0">
-                    <td className="p-3 text-xs font-bold text-gray-700 align-top">{slot.label}</td>
+                    <td className="p-3 text-xs font-bold text-gray-700 align-top w-28">{slot.label}</td>
                     {visibleDays.map((day) => (
-                      <td key={day} className="p-2 align-top border-l border-gray-100">
+                      <td key={day} className="p-2 align-top border-l border-gray-100 w-[160px]">
                         <ScheduleCell entries={entriesFor(day, slot)} onSelectInstructor={setSelectedInstructor} />
                       </td>
                     ))}

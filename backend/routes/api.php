@@ -80,6 +80,7 @@ Route::middleware('auth.jwt')->group(function () {
         Route::get('/me', [FacultyController::class, 'me']);
         Route::get('/{faculty}', [FacultyController::class, 'show']);
         Route::get('/{faculty}/consultations', [ConsultationController::class, 'index']);
+        Route::post('/{faculty}/consultations', [ConsultationController::class, 'store']);
         // Group 5: Add more faculty routes here
     });
 

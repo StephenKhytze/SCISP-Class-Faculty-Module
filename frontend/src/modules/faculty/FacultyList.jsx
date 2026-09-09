@@ -4,6 +4,7 @@ import api from '../../services/api';
 import FacultyCard from './components/FacultyCard';
 import FacultyProfileModal from './components/FacultyProfileModal';
 import TeacherBookingsDashboard from './components/TeacherBookingsDashboard';
+import BookingRequestModal from './components/BookingRequestModal';
 import { STATUS_LABELS } from './constants';
 
 const EMPTY_FILTERS = {
@@ -21,6 +22,21 @@ export default function FacultyList() {
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [selectedFaculty, setSelectedFaculty] = useState(null);
+  const [bookingFaculty, setBookingFaculty] = useState(null);
+
+  const currentUser = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem('user'));
+    } catch {
+      return null;
+    }
+  }, []);
+  const isFaculty = currentUser?.role === 'Teacher';
+  // The consultation dashboard manages bookings made against the logged-in faculty member,
+  // so it's only relevant to Faculty accounts.
+  const canManageBookings = isFaculty;
+  // Booking a consultation is a student-facing action against another faculty member.
+  const canBookConsultation = !isFaculty;
 
   useEffect(() => {
     api
@@ -58,7 +74,7 @@ export default function FacultyList() {
     });
   }, [faculties, filters]);
 
-  const handleBook = () => setActiveTab('bookings');
+  const handleBook = (faculty) => setBookingFaculty(faculty);
 
   return (
     <div>
@@ -87,17 +103,19 @@ export default function FacultyList() {
           <Users className="w-4 h-4" />
           Faculty Roster Directory ({faculties.length})
         </button>
-        <button
-          onClick={() => setActiveTab('bookings')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-t-lg text-sm font-semibold transition-colors ${
-            activeTab === 'bookings'
-              ? 'bg-[#80172B] text-white'
-              : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          <CalendarClock className="w-4 h-4" />
-          My Consultation Bookings
-        </button>
+        {canManageBookings && (
+          <button
+            onClick={() => setActiveTab('bookings')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-t-lg text-sm font-semibold transition-colors ${
+              activeTab === 'bookings'
+                ? 'bg-[#80172B] text-white'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <CalendarClock className="w-4 h-4" />
+            My Consultation Bookings
+          </button>
+        )}
       </div>
 
       {activeTab === 'directory' ? (
@@ -177,6 +195,7 @@ export default function FacultyList() {
                       faculty={faculty}
                       onViewProfile={setSelectedFaculty}
                       onBook={handleBook}
+                      canBook={canBookConsultation}
                     />
                   ))}
                 </div>
@@ -185,10 +204,11 @@ export default function FacultyList() {
           )}
         </>
       ) : (
-        <TeacherBookingsDashboard />
+        canManageBookings && <TeacherBookingsDashboard />
       )}
 
       <FacultyProfileModal faculty={selectedFaculty} onClose={() => setSelectedFaculty(null)} />
+      <BookingRequestModal faculty={bookingFaculty} onClose={() => setBookingFaculty(null)} />
     </div>
   );
 }

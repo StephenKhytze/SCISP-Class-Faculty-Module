@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { MapPin, Mail, Clock, Tag, Copy, Check, UserRound, CalendarPlus } from 'lucide-react';
 import { STATUS_STYLES, STATUS_DOT, statusLabel } from '../constants';
 
-export default function FacultyCard({ faculty, onViewProfile, onBook }) {
+export default function FacultyCard({ faculty, onViewProfile, onBook, canBook = true }) {
   const [copied, setCopied] = useState(false);
 
   const copyEmail = async () => {
@@ -93,13 +93,15 @@ export default function FacultyCard({ faculty, onViewProfile, onBook }) {
           <UserRound className="w-4 h-4" />
           View Profile
         </button>
-        <button
-          onClick={() => onBook(faculty)}
-          className="flex-1 flex items-center justify-center gap-1.5 bg-[#80172B] text-white text-sm font-medium py-2 rounded-lg hover:bg-[#651020] transition-colors"
-        >
-          <CalendarPlus className="w-4 h-4" />
-          Book
-        </button>
+        {canBook && (
+          <button
+            onClick={() => onBook(faculty)}
+            className="flex-1 flex items-center justify-center gap-1.5 bg-[#80172B] text-white text-sm font-medium py-2 rounded-lg hover:bg-[#651020] transition-colors"
+          >
+            <CalendarPlus className="w-4 h-4" />
+            Book
+          </button>
+        )}
       </div>
     </div>
   );
