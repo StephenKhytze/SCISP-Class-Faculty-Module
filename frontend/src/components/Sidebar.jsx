@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Home, Calendar, Monitor, BookOpen, GraduationCap, Users, LogOut, ArrowLeft, ArrowRight } from 'lucide-react';
 
-export default function Sidebar() {
+export default function Sidebar({ isMobileOpen = false, onCloseMobileNav = () => {}, currentUser }) {
   const location = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
 
@@ -16,19 +16,43 @@ export default function Sidebar() {
   ];
 
   return (
-    <aside 
-      className={`${isCollapsed ? 'w-[100px]' : 'w-[280px]'} bg-[#80172B] text-white flex flex-col min-h-[calc(100vh-86px)] shrink-0 transition-all duration-300 ease-in-out`}
-    >
-      {/* Collapse arrow at the top right of sidebar */}
-      <div className={`flex ${isCollapsed ? 'justify-center' : 'justify-end'} p-5 transition-all duration-300`}>
-        <button 
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className="text-white hover:bg-white/10 p-1.5 rounded transition-colors focus:outline-none"
-          title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-        >
-          {isCollapsed ? <ArrowRight className="w-6 h-6 text-white/80" /> : <ArrowLeft className="w-6 h-6 text-white/80" />}
-        </button>
-      </div>
+    <>
+      {/* Backdrop for the mobile drawer - covers the whole viewport (header included) so tapping anything outside the drawer closes it */}
+      {isMobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-40 md:hidden"
+          onClick={onCloseMobileNav}
+        />
+      )}
+
+      <aside
+        className={`fixed md:relative top-[86px] md:top-0 left-0 z-40 w-[280px] ${
+          isCollapsed ? 'md:w-[100px]' : 'md:w-[280px]'
+        } bg-[#80172B] text-white flex flex-col h-[calc(100vh-86px)] shrink-0 transition-all duration-300 ease-in-out overflow-hidden md:overflow-visible ${
+          isMobileOpen ? 'translate-x-0' : '-translate-x-full'
+        } md:translate-x-0`}
+      >
+        {/* Profile header (mobile only) - the topbar avatar is hidden on mobile, so it lives here instead */}
+        <div className="md:hidden flex items-center gap-3 px-5 pt-5 pb-4 border-b border-[#651020]">
+          <div className="w-11 h-11 rounded-full bg-white flex items-center justify-center shadow-md text-[#182848] shrink-0">
+            <GraduationCap className="w-6 h-6 text-[#182848]" />
+          </div>
+          <div className="leading-tight overflow-hidden">
+            <p className="font-bold text-[15px] text-white truncate">{currentUser?.name}</p>
+            <p className="text-[12px] text-white/70">{currentUser?.role}</p>
+          </div>
+        </div>
+
+        {/* Collapse arrow at the top right of sidebar (desktop only) */}
+        <div className={`hidden md:flex ${isCollapsed ? 'justify-center' : 'justify-end'} p-5 transition-all duration-300`}>
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="text-white hover:bg-white/10 p-1.5 rounded transition-colors focus:outline-none"
+            title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+          >
+            {isCollapsed ? <ArrowRight className="w-6 h-6 text-white/80" /> : <ArrowLeft className="w-6 h-6 text-white/80" />}
+          </button>
+        </div>
 
       {/* Navigation Links */}
       <nav className="flex-1 flex flex-col space-y-1.5 mt-2">
@@ -38,6 +62,7 @@ export default function Sidebar() {
             <div key={item.path} className="relative">
               <Link
                 to={item.path}
+                onClick={onCloseMobileNav}
                 className={`flex items-center py-4 transition-all duration-300 ${
                   isActive
                     ? 'bg-[#182848] text-white rounded-r-2xl shadow-[6px_0_15px_rgba(0,0,0,0.25)] w-[calc(100%+20px)] relative z-10'
@@ -80,6 +105,7 @@ export default function Sidebar() {
           )}
         </Link>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }
