@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Calendar, Monitor, BookOpen, GraduationCap, Users, LogOut, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Home, Calendar, Monitor, BookOpen, GraduationCap, Users, LogOut, ArrowLeft, ArrowRight, X } from 'lucide-react';
 
 export default function Sidebar({ isMobileOpen = false, onCloseMobileNav = () => {}, currentUser }) {
   const location = useLocation();
@@ -17,30 +17,40 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobileNav = () =>
 
   return (
     <>
-      {/* Backdrop for the mobile drawer - covers the whole viewport (header included) so tapping anything outside the drawer closes it */}
-      {isMobileOpen && (
-        <div
-          className="fixed inset-0 bg-black/40 z-40 md:hidden"
-          onClick={onCloseMobileNav}
-        />
-      )}
+      {/* Backdrop for the mobile drawer - always mounted so it fades in/out in step with the drawer's slide */}
+      <div
+        className={`fixed inset-0 bg-black/40 z-40 md:hidden transition-opacity duration-300 ease-in-out ${
+          isMobileOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={onCloseMobileNav}
+        aria-hidden="true"
+      />
 
       <aside
-        className={`fixed md:relative top-[86px] md:top-0 left-0 z-40 w-[280px] ${
+        className={`fixed md:relative top-0 left-0 z-40 w-[280px] ${
           isCollapsed ? 'md:w-[100px]' : 'md:w-[280px]'
-        } bg-[#80172B] text-white flex flex-col h-[calc(100vh-86px)] shrink-0 transition-all duration-300 ease-in-out overflow-hidden md:overflow-visible ${
+        } bg-[#80172B] text-white flex flex-col h-screen md:h-[calc(100vh-86px)] shrink-0 transition-transform duration-300 ease-in-out md:transition-[width] overflow-hidden md:overflow-visible ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
         } md:translate-x-0`}
       >
-        {/* Profile header (mobile only) - the topbar avatar is hidden on mobile, so it lives here instead */}
-        <div className="md:hidden flex items-center gap-3 px-5 pt-5 pb-4 border-b border-[#651020]">
-          <div className="w-11 h-11 rounded-full bg-white flex items-center justify-center shadow-md text-[#182848] shrink-0">
-            <GraduationCap className="w-6 h-6 text-[#182848]" />
+        {/* Profile header (mobile only) - the drawer now covers the topbar, so its avatar + a close button live here instead */}
+        <div className="md:hidden flex items-center justify-between gap-3 px-5 pt-5 pb-4 border-b border-[#651020]">
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="w-11 h-11 rounded-full bg-white flex items-center justify-center shadow-md text-[#182848] shrink-0">
+              <GraduationCap className="w-6 h-6 text-[#182848]" />
+            </div>
+            <div className="leading-tight overflow-hidden">
+              <p className="font-bold text-[15px] text-white truncate">{currentUser?.name}</p>
+              <p className="text-[12px] text-white/70">{currentUser?.role}</p>
+            </div>
           </div>
-          <div className="leading-tight overflow-hidden">
-            <p className="font-bold text-[15px] text-white truncate">{currentUser?.name}</p>
-            <p className="text-[12px] text-white/70">{currentUser?.role}</p>
-          </div>
+          <button
+            onClick={onCloseMobileNav}
+            className="text-white hover:bg-white/10 p-1.5 rounded transition-colors focus:outline-none shrink-0"
+            title="Close Menu"
+          >
+            <X className="w-6 h-6 text-white/80" />
+          </button>
         </div>
 
         {/* Collapse arrow at the top right of sidebar (desktop only) */}
