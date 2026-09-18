@@ -19,7 +19,7 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobileNav = () =>
     <>
       {/* Backdrop for the mobile drawer - always mounted so it fades in/out in step with the drawer's slide */}
       <div
-        className={`fixed inset-0 bg-black/40 z-40 md:hidden transition-opacity duration-300 ease-in-out ${
+        className={`print:hidden fixed inset-0 bg-black/40 z-40 md:hidden transition-opacity duration-300 ease-in-out ${
           isMobileOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
         onClick={onCloseMobileNav}
@@ -27,7 +27,7 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobileNav = () =>
       />
 
       <aside
-        className={`fixed md:relative top-0 left-0 z-40 w-[280px] ${
+        className={`print:hidden fixed md:relative top-0 left-0 z-40 w-[280px] ${
           isCollapsed ? 'md:w-[100px]' : 'md:w-[280px]'
         } bg-[#80172B] text-white flex flex-col h-screen md:h-[calc(100vh-86px)] shrink-0 transition-transform duration-300 ease-in-out md:transition-[width] overflow-hidden md:overflow-visible ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'

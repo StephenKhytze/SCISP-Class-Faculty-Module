@@ -16,7 +16,7 @@ export default function Layout() {
   };
 
   return (
-    <div className="flex flex-col h-screen m-0 p-0 overflow-hidden bg-gray-100">
+    <div className="flex flex-col h-screen print:h-auto m-0 p-0 overflow-hidden print:overflow-visible bg-gray-100 print:bg-white">
       {/* Topbar spans the full width at the top */}
       <Topbar
         currentUser={user}
@@ -26,9 +26,9 @@ export default function Layout() {
       />
 
       {/* Container for Sidebar and Main Content */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden print:overflow-visible">
         <Sidebar isMobileOpen={isMobileNavOpen} onCloseMobileNav={() => setIsMobileNavOpen(false)} currentUser={user} />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-8 bg-[#f8f9fa]">
+        <main className="flex-1 overflow-y-auto print:overflow-visible p-4 sm:p-8 print:p-0 bg-[#f8f9fa] print:bg-white">
           <Outlet />
         </main>
       </div>

@@ -23,7 +23,7 @@ export default function Topbar({
   ];
 
   return (
-    <header className="h-[86px] bg-[#80172B] text-white flex items-center justify-between pr-8 select-none relative z-30 shadow-md border-b-2 border-[#651020]" style={{ paddingLeft: '32px' }}>
+    <header className="print:hidden h-[86px] bg-[#80172B] text-white flex items-center justify-between pr-8 select-none relative z-30 shadow-md border-b-2 border-[#651020]" style={{ paddingLeft: '32px' }}>
       {/* Left: Mobile menu toggle + ABC SCHOOL Brand Logo */}
       <div className="flex items-center space-x-3">
         <button

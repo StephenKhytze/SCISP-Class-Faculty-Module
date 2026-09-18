@@ -81,18 +81,34 @@ export default function ScheduleView() {
       (s) => s.day === day && s.start_time < slot.end && s.end_time > slot.start
     );
 
+  const printedOn = new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
   return (
     <div>
+      {/* Print-only masthead - hidden on screen, shown only on the printed/PDF output */}
+      <div className="hidden print:flex items-end justify-between border-b-2 border-[#80172B] pb-3 mb-5">
+        <div className="flex items-baseline gap-1.5">
+          <span className="font-extrabold text-3xl tracking-tighter text-[#80172B]">ABC</span>
+          <span className="px-1.5 py-[2px] bg-[#182848] text-white text-[10px] font-bold tracking-wider rounded uppercase">
+            School
+          </span>
+        </div>
+        <div className="text-right text-[11px] text-gray-500 leading-tight">
+          <p>Class Schedule &amp; Timetable</p>
+          <p className="font-semibold text-gray-700">Printed {printedOn}{currentUser?.name ? ` · ${currentUser.name}` : ''}</p>
+        </div>
+      </div>
+
       <div className="flex items-start justify-between mb-6">
         <div>
-          <h2 className="text-2xl font-extrabold text-gray-900">Class Schedule & Timetable</h2>
-          <p className="text-sm text-gray-500 mt-1">
+          <h2 className="text-2xl font-extrabold text-gray-900 print:hidden">Class Schedule & Timetable</h2>
+          <p className="text-sm text-gray-500 mt-1 print:hidden">
             Weekly calendar timetable view, course & year level filtering, instructor profile popups, conflict detection.
           </p>
         </div>
         <button
           onClick={() => window.print()}
-          className="flex items-center gap-2 bg-[#182848] text-white text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-[#0f1a33] transition-colors shrink-0"
+          className="print:hidden flex items-center gap-2 bg-[#182848] text-white text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-[#0f1a33] transition-colors shrink-0"
         >
           <FileDown className="w-4 h-4" />
           Download PDF
@@ -100,7 +116,7 @@ export default function ScheduleView() {
       </div>
 
       {currentClass && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 flex items-center justify-between gap-4">
+        <div className="print:hidden bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 flex items-center justify-between gap-4">
           <div className="flex items-start gap-3">
             <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
               <Lightbulb className="w-5 h-5 text-amber-600" />
@@ -131,7 +147,7 @@ export default function ScheduleView() {
         </div>
       )}
 
-      <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6">
+      <div className="print:hidden bg-white border border-gray-200 rounded-xl p-5 mb-6">
         <div className={`grid grid-cols-1 gap-4 ${canFilterByCourse ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
           <div>
             <label className="text-[11px] font-semibold text-gray-400 uppercase">Search Subject / Room</label>
@@ -169,17 +185,17 @@ export default function ScheduleView() {
       {error && <p className="text-sm text-rose-600">{error}</p>}
 
       {!loading && !error && (
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-200">
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden print:border-0 print:rounded-none">
+          <div className="px-5 py-4 border-b border-gray-200 print:hidden">
             <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Weekly Timetable Calendar Grid</span>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse table-fixed">
+          <div className="overflow-x-auto print:overflow-visible">
+            <table className="w-full border-collapse table-fixed print:table-auto">
               <thead>
-                <tr className="border-b border-gray-200">
-                  <th className="text-left text-xs font-bold text-gray-500 uppercase p-3 w-28">Time</th>
+                <tr className="border-b border-gray-200 print:bg-[#182848]">
+                  <th className="text-left text-xs font-bold text-gray-500 uppercase p-3 w-28 print:w-auto print:text-white">Time</th>
                   {visibleDays.map((day) => (
-                    <th key={day} className="text-left text-xs font-bold text-gray-500 uppercase p-3 w-[160px]">
+                    <th key={day} className="text-left text-xs font-bold text-gray-500 uppercase p-3 w-[160px] print:w-auto print:text-white">
                       {day}
                     </th>
                   ))}
@@ -188,9 +204,9 @@ export default function ScheduleView() {
               <tbody>
                 {TIME_SLOTS.map((slot) => (
                   <tr key={slot.label} className="border-b border-gray-100 last:border-b-0">
-                    <td className="p-3 text-xs font-bold text-gray-700 align-top w-28">{slot.label}</td>
+                    <td className="p-3 text-xs font-bold text-gray-700 align-top w-28 print:w-auto">{slot.label}</td>
                     {visibleDays.map((day) => (
-                      <td key={day} className="p-2 align-top border-l border-gray-100 w-[160px]">
+                      <td key={day} className="p-2 align-top border-l border-gray-100 w-[160px] print:w-auto">
                         <ScheduleCell entries={entriesFor(day, slot)} onSelectInstructor={setSelectedInstructor} />
                       </td>
                     ))}
