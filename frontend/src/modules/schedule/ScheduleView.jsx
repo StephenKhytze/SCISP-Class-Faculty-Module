@@ -1,25 +1,30 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search, FileDown, Lightbulb, ArrowRight, ArrowLeft, UserCheck, BookOpen, Plus, Bell, Archive, ArchiveRestore } from 'lucide-react';
+import { Search, FileDown, Lightbulb, ArrowRight, ArrowLeft, UserCheck, GraduationCap, School, Landmark, Plus, Bell, Archive, ArchiveRestore } from 'lucide-react';
 import api from '../../services/api';
 import ScheduleCell from './components/ScheduleCell';
 import InstructorProfileModal from './components/InstructorProfileModal';
 import ClassDetailModal from './components/ClassDetailModal';
 import ScheduleEditModal from './components/ScheduleEditModal';
-import { DAYS, TIME_SLOTS, currentDayName, currentTimeHHMM } from './constants';
+import { DAYS, TIME_SLOTS, EDUCATION_LEVELS, BASIC_ED_YEAR_GROUPS, STRANDS, isSeniorHigh, currentDayName, currentTimeHHMM, compactHour } from './constants';
+
+const EDUCATION_LEVEL_ICONS = { College: Landmark, Masteral: GraduationCap, 'Basic Ed': School };
+const EDUCATION_LEVEL_DESCRIPTIONS = {
+  College: 'View every College class by course, year level, and section',
+  Masteral: 'View every Masteral class by graduate program, year level, and section',
+  'Basic Ed': 'View every Basic Ed class by grade level and section',
+};
 
 const EMPTY_FILTERS = {
   search: '',
+  educationLevel: '',
   level: '',
   year: '',
+  strand: '',
+  section: '',
   facultyId: '',
   dayRange: 'weekdays',
 };
-
-function compactHour(hhmm) {
-  const h = parseInt(hhmm.split(':')[0], 10);
-  return String(h % 12 === 0 ? 12 : h % 12);
-}
 
 export default function ScheduleView() {
   const [schedules, setSchedules] = useState([]);
@@ -51,9 +56,17 @@ export default function ScheduleView() {
       : EMPTY_FILTERS
   );
 
+  // screen: landing
+  //   -> pick-basic-ed-level -> pick-grade -> [pick-strand, SHS only] -> pick-section -> grid
+  //   -> pick-course -> pick-year -> pick-section -> grid
+  //   -> pick-teacher -> grid
   const [screen, setScreen] = useState('landing');
   const [category, setCategory] = useState(null); // 'class' | 'teacher' | null
-  const [pendingCourse, setPendingCourse] = useState(null);
+  const [educationCategory, setEducationCategory] = useState(null); // College | Masteral | Basic Ed
+  const [basicEdLevel, setBasicEdLevel] = useState(null); // Elementary | Junior High School | Senior High School
+  const [pendingProgram, setPendingProgram] = useState(null); // College/Masteral course or program name
+  const [pendingGrade, setPendingGrade] = useState(null); // Basic Ed grade, or College/Masteral year level
+  const [pendingStrand, setPendingStrand] = useState(null); // Basic Ed SHS strand
 
   useEffect(() => {
     setLoading(true);
@@ -117,11 +130,41 @@ export default function ScheduleView() {
     }
   }, [isStudent, loading, schedules, filters.level, filters.year, currentUser]);
 
-  const levels = useMemo(() => [...new Set(schedules.map((s) => s.level))].filter(Boolean).sort(), [schedules]);
-  const yearsForPendingCourse = useMemo(
-    () => [...new Set(schedules.filter((s) => s.level === pendingCourse).map((s) => s.year))].filter(Boolean).sort(),
-    [schedules, pendingCourse]
+  // Programs/courses available under the currently browsed education category.
+  const programs = useMemo(
+    () =>
+      [...new Set(schedules.filter((s) => s.education_level === educationCategory).map((s) => s.level))]
+        .filter(Boolean)
+        .sort(),
+    [schedules, educationCategory]
   );
+  const yearsForPendingProgram = useMemo(
+    () =>
+      [
+        ...new Set(
+          schedules
+            .filter((s) => s.education_level === educationCategory && s.level === pendingProgram)
+            .map((s) => s.year)
+        ),
+      ].filter(Boolean).sort(),
+    [schedules, educationCategory, pendingProgram]
+  );
+
+  // Sections available for whatever scope has been narrowed down so far - always offers
+  // an "All Sections" fallback so records saved without a section stay reachable.
+  const sectionsInScope = useMemo(() => {
+    const matches = schedules.filter((s) => {
+      if (s.education_level !== educationCategory) return false;
+      if (educationCategory === 'Basic Ed') {
+        if (s.level !== basicEdLevel || s.year !== pendingGrade) return false;
+        if (isSeniorHigh(pendingGrade) && s.strand !== pendingStrand) return false;
+        return true;
+      }
+      return s.level === pendingProgram && s.year === pendingGrade;
+    });
+    return [...new Set(matches.map((s) => s.section))].filter(Boolean).sort();
+  }, [schedules, educationCategory, basicEdLevel, pendingGrade, pendingStrand, pendingProgram]);
+
   const subjects = useMemo(() => {
     const map = new Map();
     schedules.forEach((s) => {
@@ -149,8 +192,11 @@ export default function ScheduleView() {
   const filteredSchedules = useMemo(() => {
     const keyword = filters.search.trim().toLowerCase();
     return schedulesWithConflicts.filter((s) => {
+      if (filters.educationLevel && s.education_level !== filters.educationLevel) return false;
       if (filters.level && s.level !== filters.level) return false;
       if (filters.year && s.year !== filters.year) return false;
+      if (filters.strand && s.strand !== filters.strand) return false;
+      if (filters.section && s.section !== filters.section) return false;
       if (filters.facultyId && String(s.faculty?.faculty_id) !== String(filters.facultyId)) return false;
       if (keyword) {
         const haystack = `${s.subject_code} ${s.subject_name} ${s.room}`.toLowerCase();
@@ -208,48 +254,154 @@ export default function ScheduleView() {
     backToLanding();
   };
 
-  const openClassFlow = () => {
+  // --- Navigation: Basic Ed and College/Masteral both funnel into pick-section, then grid ---
+
+  const openClassFlow = (level) => {
     setCategory('class');
-    setScreen('pick-course');
+    setEducationCategory(level);
+    setBasicEdLevel(null);
+    setPendingProgram(null);
+    setPendingGrade(null);
+    setPendingStrand(null);
+    setScreen(level === 'Basic Ed' ? 'pick-basic-ed-level' : 'pick-course');
   };
   const openTeacherFlow = () => {
     setCategory('teacher');
     setScreen('pick-teacher');
   };
 
+  const pickBasicEdLevelStep = (level) => {
+    setBasicEdLevel(level);
+    setPendingGrade(null);
+    setPendingStrand(null);
+    setScreen('pick-grade');
+  };
+  const pickGradeStep = (grade) => {
+    setPendingGrade(grade);
+    setPendingStrand(null);
+    setScreen(isSeniorHigh(grade) ? 'pick-strand' : 'pick-section');
+  };
+  const pickStrandStep = (strand) => {
+    setPendingStrand(strand);
+    setScreen('pick-section');
+  };
+
   const pickCourseStep = (course) => {
-    setPendingCourse(course);
+    setPendingProgram(course);
+    setPendingGrade(null);
     setScreen('pick-year');
   };
   const pickYearStep = (year) => {
-    setFilters({ ...EMPTY_FILTERS, level: pendingCourse, year });
+    setPendingGrade(year);
+    setScreen('pick-section');
+  };
+
+  const pickSectionStep = (section) => {
+    if (educationCategory === 'Basic Ed') {
+      setFilters({
+        ...EMPTY_FILTERS,
+        educationLevel: 'Basic Ed',
+        level: basicEdLevel,
+        year: pendingGrade,
+        strand: pendingStrand || '',
+        section,
+      });
+    } else {
+      setFilters({
+        ...EMPTY_FILTERS,
+        educationLevel: educationCategory,
+        level: pendingProgram,
+        year: pendingGrade,
+        section,
+      });
+    }
     setScreen('grid');
   };
+
   const pickTeacherStep = (facultyId) => {
     setFilters({ ...EMPTY_FILTERS, facultyId });
     setScreen('grid');
   };
+
   const backToLanding = () => {
     setScreen('landing');
     setCategory(null);
-    setPendingCourse(null);
+    setEducationCategory(null);
+    setBasicEdLevel(null);
+    setPendingProgram(null);
+    setPendingGrade(null);
+    setPendingStrand(null);
+    setFilters(EMPTY_FILTERS);
+  };
+  const backToBasicEdLevelPick = () => {
+    setScreen('pick-basic-ed-level');
+    setBasicEdLevel(null);
+    setPendingGrade(null);
+    setPendingStrand(null);
+    setFilters(EMPTY_FILTERS);
+  };
+  const backToGradePick = () => {
+    setScreen('pick-grade');
+    setPendingStrand(null);
     setFilters(EMPTY_FILTERS);
   };
   const backToCoursePick = () => {
     setScreen('pick-course');
+    setPendingProgram(null);
+    setPendingGrade(null);
     setFilters(EMPTY_FILTERS);
   };
+  const backFromSectionPick = () => {
+    setFilters(EMPTY_FILTERS);
+    if (educationCategory === 'Basic Ed') {
+      setScreen(isSeniorHigh(pendingGrade) ? 'pick-strand' : 'pick-grade');
+    } else {
+      setScreen('pick-year');
+    }
+  };
+  // From the grid, "Back to Sections" returns to the section picker itself (one level
+  // up), not past it - backFromSectionPick is for the section picker's own back-link.
+  const backToSectionPick = () => {
+    setScreen('pick-section');
+    setFilters(EMPTY_FILTERS);
+  };
+
+  const programLabel = educationCategory === 'Masteral' ? 'Graduate Program' : 'Course';
 
   const scopeLabel =
     category === 'teacher'
       ? faculties.find((f) => String(f.faculty_id) === String(filters.facultyId))?.name
       : category === 'class'
-      ? [filters.level, filters.year].filter(Boolean).join(' · ')
+      ? [
+          filters.educationLevel,
+          filters.educationLevel === 'Basic Ed' ? basicEdLevel : null,
+          filters.educationLevel === 'Basic Ed' ? null : filters.level,
+          filters.year,
+          filters.strand,
+          filters.section && `Section ${filters.section}`,
+        ]
+          .filter(Boolean)
+          .join(' · ')
       : '';
 
   const showGrid = isStudent || screen === 'grid';
   const showLanding = !isStudent && !isFaculty && screen === 'landing';
   const canBrowse = !isStudent && !isFaculty;
+  // Add Schedule only makes sense once the admin has drilled down to one specific
+  // class/section timetable - never on a picker screen, the landing page, or the
+  // read-only "By Teacher" browse view.
+  const showAddSchedule = isAdmin && !viewingArchived && screen === 'grid' && category === 'class';
+
+  const scheduleModalContext =
+    category === 'class' && screen === 'grid'
+      ? {
+          education_level: filters.educationLevel,
+          level: filters.level,
+          year: filters.year,
+          strand: filters.strand,
+          section: filters.section,
+        }
+      : null;
 
   const printedOn = new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -303,7 +455,7 @@ export default function ScheduleView() {
           )}
         </div>
         <div className="print:hidden flex flex-wrap items-center gap-2">
-          {isAdmin && !viewingArchived && (
+          {showAddSchedule && (
             <button
               onClick={() => setEditingSchedule({})}
               className="flex items-center gap-2 bg-[#80172B] text-white text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-[#651020] transition-colors"
@@ -398,13 +550,16 @@ export default function ScheduleView() {
             <h3 className="text-lg font-bold text-gray-900">Browse the Schedule</h3>
             <p className="text-sm text-gray-500 mt-1">Choose how you'd like to view the class schedule.</p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-2xl mx-auto">
-            <BrowseCard
-              icon={BookOpen}
-              title="By Course & Year"
-              description="View every class under a specific course and year level"
-              onClick={openClassFlow}
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 max-w-4xl mx-auto">
+            {EDUCATION_LEVELS.map((lvl) => (
+              <BrowseCard
+                key={lvl}
+                icon={EDUCATION_LEVEL_ICONS[lvl]}
+                title={lvl}
+                description={EDUCATION_LEVEL_DESCRIPTIONS[lvl]}
+                onClick={() => openClassFlow(lvl)}
+              />
+            ))}
             <BrowseCard
               icon={UserCheck}
               title="By Teacher"
@@ -415,18 +570,82 @@ export default function ScheduleView() {
         </div>
       )}
 
+      {!loading && !error && !isStudent && screen === 'pick-basic-ed-level' && (
+        <div className="print:hidden bg-white border border-gray-200 rounded-xl p-5 mb-6">
+          <button onClick={backToLanding} className="flex items-center gap-1.5 text-xs font-semibold text-[#80172B] hover:underline mb-4">
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Back to Browse Options
+          </button>
+          <h3 className="text-sm font-bold text-gray-900 mb-3">Select a Level under Basic Ed</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-2xl">
+            {Object.entries(BASIC_ED_YEAR_GROUPS).map(([group, grades]) => (
+              <button
+                key={group}
+                onClick={() => pickBasicEdLevelStep(group)}
+                className="text-left px-4 py-4 border border-gray-200 rounded-lg hover:border-[#80172B] hover:bg-[#80172B]/5 transition-colors"
+              >
+                <p className="text-sm font-semibold text-gray-900">{group}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{grades[0]} - {grades[grades.length - 1]}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!loading && !error && !isStudent && screen === 'pick-grade' && (
+        <div className="print:hidden bg-white border border-gray-200 rounded-xl p-5 mb-6">
+          <button onClick={backToBasicEdLevelPick} className="flex items-center gap-1.5 text-xs font-semibold text-[#80172B] hover:underline mb-4">
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Back to Levels
+          </button>
+          <h3 className="text-sm font-bold text-gray-900 mb-3">Select a Grade under {basicEdLevel}</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+            {(BASIC_ED_YEAR_GROUPS[basicEdLevel] || []).map((grade) => (
+              <button
+                key={grade}
+                onClick={() => pickGradeStep(grade)}
+                className="text-left px-3 py-2.5 border border-gray-200 rounded-lg hover:border-[#80172B] hover:bg-[#80172B]/5 transition-colors"
+              >
+                <p className="text-sm font-semibold text-gray-900">{grade}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {!loading && !error && !isStudent && screen === 'pick-strand' && (
+        <div className="print:hidden bg-white border border-gray-200 rounded-xl p-5 mb-6">
+          <button onClick={backToGradePick} className="flex items-center gap-1.5 text-xs font-semibold text-[#80172B] hover:underline mb-4">
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Back to Grades
+          </button>
+          <h3 className="text-sm font-bold text-gray-900 mb-3">Select a Strand for {pendingGrade}</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+            {STRANDS.map((s) => (
+              <button
+                key={s}
+                onClick={() => pickStrandStep(s)}
+                className="text-left px-3 py-2.5 border border-gray-200 rounded-lg hover:border-[#80172B] hover:bg-[#80172B]/5 transition-colors"
+              >
+                <p className="text-sm font-semibold text-gray-900">{s}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {!loading && !error && !isStudent && screen === 'pick-course' && (
         <div className="print:hidden bg-white border border-gray-200 rounded-xl p-5 mb-6">
           <button onClick={backToLanding} className="flex items-center gap-1.5 text-xs font-semibold text-[#80172B] hover:underline mb-4">
             <ArrowLeft className="w-3.5 h-3.5" />
             Back to Browse Options
           </button>
-          <h3 className="text-sm font-bold text-gray-900 mb-3">Select a Course</h3>
+          <h3 className="text-sm font-bold text-gray-900 mb-3">Select a {programLabel} under {educationCategory}</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-            {levels.length === 0 ? (
-              <p className="text-sm text-gray-500 col-span-full">No courses found in the schedule yet.</p>
+            {programs.length === 0 ? (
+              <p className="text-sm text-gray-500 col-span-full">No {educationCategory} {programLabel.toLowerCase()}s found in the schedule yet.</p>
             ) : (
-              levels.map((lvl) => (
+              programs.map((lvl) => (
                 <button
                   key={lvl}
                   onClick={() => pickCourseStep(lvl)}
@@ -444,14 +663,14 @@ export default function ScheduleView() {
         <div className="print:hidden bg-white border border-gray-200 rounded-xl p-5 mb-6">
           <button onClick={backToCoursePick} className="flex items-center gap-1.5 text-xs font-semibold text-[#80172B] hover:underline mb-4">
             <ArrowLeft className="w-3.5 h-3.5" />
-            Back to Courses
+            Back to {programLabel}s
           </button>
-          <h3 className="text-sm font-bold text-gray-900 mb-3">Select a Year Level for {pendingCourse}</h3>
+          <h3 className="text-sm font-bold text-gray-900 mb-3">Select a Year Level for {pendingProgram}</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-            {yearsForPendingCourse.length === 0 ? (
-              <p className="text-sm text-gray-500 col-span-full">No year levels found for {pendingCourse} yet.</p>
+            {yearsForPendingProgram.length === 0 ? (
+              <p className="text-sm text-gray-500 col-span-full">No year levels found for {pendingProgram} yet.</p>
             ) : (
-              yearsForPendingCourse.map((yr) => (
+              yearsForPendingProgram.map((yr) => (
                 <button
                   key={yr}
                   onClick={() => pickYearStep(yr)}
@@ -461,6 +680,34 @@ export default function ScheduleView() {
                 </button>
               ))
             )}
+          </div>
+        </div>
+      )}
+
+      {!loading && !error && !isStudent && screen === 'pick-section' && (
+        <div className="print:hidden bg-white border border-gray-200 rounded-xl p-5 mb-6">
+          <button onClick={backFromSectionPick} className="flex items-center gap-1.5 text-xs font-semibold text-[#80172B] hover:underline mb-4">
+            <ArrowLeft className="w-3.5 h-3.5" />
+            Back to {educationCategory === 'Basic Ed' ? (isSeniorHigh(pendingGrade) ? 'Strands' : 'Grades') : 'Year Levels'}
+          </button>
+          <h3 className="text-sm font-bold text-gray-900 mb-3">Select a Section</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+            {sectionsInScope.map((section) => (
+              <button
+                key={section}
+                onClick={() => pickSectionStep(section)}
+                className="text-left px-3 py-2.5 border border-gray-200 rounded-lg hover:border-[#80172B] hover:bg-[#80172B]/5 transition-colors"
+              >
+                <p className="text-sm font-semibold text-gray-900">Section {section}</p>
+              </button>
+            ))}
+            <button
+              onClick={() => pickSectionStep('')}
+              className="text-left px-3 py-2.5 border border-dashed border-gray-300 rounded-lg hover:border-[#80172B] hover:bg-[#80172B]/5 transition-colors"
+            >
+              <p className="text-sm font-semibold text-gray-900">All Sections</p>
+              <p className="text-xs text-gray-500 mt-0.5">Classes not assigned to a specific section</p>
+            </button>
           </div>
         </div>
       )}
@@ -501,13 +748,20 @@ export default function ScheduleView() {
               </button>
             ) : (
               canBrowse && (
-                <button onClick={backToLanding} className="flex items-center gap-1.5 text-xs font-semibold text-[#80172B] hover:underline mb-4">
+                <button
+                  onClick={category === 'teacher' ? backToLanding : backToSectionPick}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-[#80172B] hover:underline mb-4"
+                >
                   <ArrowLeft className="w-3.5 h-3.5" />
-                  Change {category === 'teacher' ? 'Teacher' : 'Course & Year'}
+                  {category === 'teacher' ? 'Change Teacher' : 'Back to Sections'}
                 </button>
               )
             )}
-            <div className={`grid grid-cols-1 gap-4 ${viewingArchived ? '' : 'md:grid-cols-2'}`}>
+            <div
+              className={`grid grid-cols-1 gap-4 ${
+                viewingArchived ? '' : isSeniorHigh(filters.year) ? 'md:grid-cols-3' : 'md:grid-cols-2'
+              }`}
+            >
               <div>
                 <label className="text-[11px] font-semibold text-gray-400 uppercase">Search Subject / Room</label>
                 <div className="relative mt-1">
@@ -520,6 +774,22 @@ export default function ScheduleView() {
                   />
                 </div>
               </div>
+
+              {!viewingArchived && isSeniorHigh(filters.year) && (
+                <div>
+                  <label className="text-[11px] font-semibold text-gray-400 uppercase">Strand</label>
+                  <select
+                    value={filters.strand}
+                    onChange={(e) => setFilters((f) => ({ ...f, strand: e.target.value }))}
+                    className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#80172B]/30"
+                  >
+                    <option value="">All Strands</option>
+                    {STRANDS.map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {!viewingArchived && (
                 <div>
@@ -632,6 +902,8 @@ export default function ScheduleView() {
       <ScheduleEditModal
         schedule={editingSchedule}
         subjects={subjects}
+        allSchedules={schedules}
+        context={scheduleModalContext}
         onClose={() => setEditingSchedule(null)}
         onSaved={handleScheduleSaved}
       />

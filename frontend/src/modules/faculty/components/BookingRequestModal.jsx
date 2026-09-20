@@ -7,6 +7,13 @@ const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
 const BOOKED_STATUSES = ['pending', 'approved'];
 
 export default function BookingRequestModal({ faculty, onClose }) {
+  const currentUser = useMemo(() => {
+    try {
+      return JSON.parse(localStorage.getItem('user'));
+    } catch {
+      return null;
+    }
+  }, []);
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -58,13 +65,6 @@ export default function BookingRequestModal({ faculty, onClose }) {
     setError(null);
     setSubmitting(true);
 
-    let currentUser = null;
-    try {
-      currentUser = JSON.parse(localStorage.getItem('user'));
-    } catch {
-      currentUser = null;
-    }
-
     api
       .post(`/faculty/${faculty.faculty_id}/consultations`, {
         consultation_date: date,
@@ -115,6 +115,8 @@ export default function BookingRequestModal({ faculty, onClose }) {
                 schedule={facultySchedule}
                 bookings={visibleBookings}
                 officeHoursText={faculty.office_hours}
+                studentPrivacyMode
+                viewerName={currentUser?.name}
               />
             </div>
 

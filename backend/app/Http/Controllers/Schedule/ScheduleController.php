@@ -29,12 +29,20 @@ class ScheduleController extends Controller
             });
         }
 
+        if ($educationLevel = $request->query('education_level')) {
+            $query->where('education_level', $educationLevel);
+        }
+
         if ($level = $request->query('level')) {
             $query->where('level', $level);
         }
 
         if ($year = $request->query('year')) {
             $query->where('year', $year);
+        }
+
+        if ($strand = $request->query('strand')) {
+            $query->where('strand', $strand);
         }
 
         if ($day = $request->query('day')) {
@@ -68,10 +76,12 @@ class ScheduleController extends Controller
             'subject_id' => 'nullable|exists:subjects,subject_id',
             'new_subject_code' => 'required_without:subject_id|nullable|string',
             'new_subject_name' => 'required_without:subject_id|nullable|string',
+            'education_level' => 'required|in:College,Masteral,Basic Ed',
             'faculty_id' => 'required|exists:faculty,faculty_id',
             'room' => 'nullable|string',
             'level' => 'nullable|string',
             'year' => 'nullable|string',
+            'strand' => 'nullable|string',
             'section' => 'nullable|string',
             'day' => 'required|string',
             'start_time' => 'required',
