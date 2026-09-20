@@ -17,7 +17,6 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobileNav = () =>
 
   return (
     <>
-      {/* Backdrop for the mobile drawer - always mounted so it fades in/out in step with the drawer's slide */}
       <div
         className={`print:hidden fixed inset-0 bg-black/40 z-40 md:hidden transition-opacity duration-300 ease-in-out ${
           isMobileOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
@@ -33,7 +32,6 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobileNav = () =>
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
         } md:translate-x-0`}
       >
-        {/* Profile header (mobile only) - the drawer now covers the topbar, so its avatar + a close button live here instead */}
         <div className="md:hidden flex items-center justify-between gap-3 px-5 pt-5 pb-4 border-b border-[#651020]">
           <div className="flex items-center gap-3 overflow-hidden">
             <div className="w-11 h-11 rounded-full bg-white flex items-center justify-center shadow-md text-[#182848] shrink-0">
@@ -42,6 +40,20 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobileNav = () =>
             <div className="leading-tight overflow-hidden">
               <p className="font-bold text-[15px] text-white truncate">{currentUser?.name}</p>
               <p className="text-[12px] text-white/70">{currentUser?.role}</p>
+              {(currentUser?.level || currentUser?.year) && (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {currentUser.level && (
+                    <span className="inline-flex items-center bg-white/15 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
+                      {currentUser.level}
+                    </span>
+                  )}
+                  {currentUser.year && (
+                    <span className="inline-flex items-center bg-white/15 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
+                      {currentUser.year}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           <button
@@ -53,7 +65,6 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobileNav = () =>
           </button>
         </div>
 
-        {/* Collapse arrow at the top right of sidebar (desktop only) */}
         <div className={`hidden md:flex ${isCollapsed ? 'justify-center' : 'justify-end'} p-5 transition-all duration-300`}>
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
@@ -64,7 +75,6 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobileNav = () =>
           </button>
         </div>
 
-      {/* Navigation Links */}
       <nav className="flex-1 flex flex-col space-y-1.5 mt-2">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
@@ -93,7 +103,6 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobileNav = () =>
         })}
       </nav>
 
-      {/* Sign Out Button at the bottom */}
       <div className="mt-auto border-t border-[#651020] pt-4 pb-6">
         <Link
           to="/auth"

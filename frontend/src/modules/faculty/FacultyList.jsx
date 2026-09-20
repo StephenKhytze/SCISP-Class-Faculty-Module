@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Search, RotateCcw, Users, CalendarClock } from 'lucide-react';
+import { Search, RotateCcw, Users, CalendarClock, UserPlus, ClipboardList } from 'lucide-react';
 import api from '../../services/api';
 import FacultyCard from './components/FacultyCard';
 import FacultyProfileModal from './components/FacultyProfileModal';
 import TeacherBookingsDashboard from './components/TeacherBookingsDashboard';
+import MyBookingsPanel from './components/MyBookingsPanel';
+import AdminBookingsPanel from './components/AdminBookingsPanel';
 import BookingRequestModal from './components/BookingRequestModal';
+import FacultyEditModal from './components/FacultyEditModal';
+import FacultyScheduleModal from './components/FacultyScheduleModal';
 import { STATUS_LABELS } from './constants';
 
 const EMPTY_FILTERS = {
@@ -16,14 +20,6 @@ const EMPTY_FILTERS = {
 };
 
 export default function FacultyList() {
-  const [activeTab, setActiveTab] = useState('directory');
-  const [faculties, setFaculties] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [filters, setFilters] = useState(EMPTY_FILTERS);
-  const [selectedFaculty, setSelectedFaculty] = useState(null);
-  const [bookingFaculty, setBookingFaculty] = useState(null);
-
   const currentUser = useMemo(() => {
     try {
       return JSON.parse(localStorage.getItem('user'));
@@ -32,19 +28,53 @@ export default function FacultyList() {
     }
   }, []);
   const isFaculty = currentUser?.role === 'Teacher';
-  // The consultation dashboard manages bookings made against the logged-in faculty member,
-  // so it's only relevant to Faculty accounts.
+  const isAdmin = currentUser?.role === 'Admin';
+  const isStudent = currentUser?.role === 'Student';
   const canManageBookings = isFaculty;
-  // Booking a consultation is a student-facing action against another faculty member.
-  const canBookConsultation = !isFaculty;
+  const canBookConsultation = !isFaculty && !isAdmin;
+  const canEditFaculty = isAdmin;
+  const canViewMyBookings = isStudent;
+  const canViewDirectory = !isFaculty;
+  const canManageAllBookings = isAdmin;
+
+  const [activeTab, setActiveTab] = useState(isFaculty ? 'bookings' : 'directory');
+  const [faculties, setFaculties] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [selectedFaculty, setSelectedFaculty] = useState(null);
+  const [bookingFaculty, setBookingFaculty] = useState(null);
+  const [editingFaculty, setEditingFaculty] = useState(null);
+  const [scheduleViewFaculty, setScheduleViewFaculty] = useState(null);
+  const [pendingByFaculty, setPendingByFaculty] = useState({});
 
   useEffect(() => {
+    if (!canViewDirectory) {
+      setLoading(false);
+      return;
+    }
     api
       .get('/faculty')
       .then((res) => setFaculties(res.data))
       .catch(() => setError('Unable to load faculty directory.'))
       .finally(() => setLoading(false));
-  }, []);
+  }, [canViewDirectory]);
+
+  const refreshPendingCounts = () => {
+    if (!isAdmin) return;
+    api
+      .get('/consultations', { params: { status: 'pending' } })
+      .then((res) => {
+        const counts = {};
+        res.data.forEach((b) => {
+          counts[b.faculty_id] = (counts[b.faculty_id] || 0) + 1;
+        });
+        setPendingByFaculty(counts);
+      })
+      .catch(() => setPendingByFaculty({}));
+  };
+
+  useEffect(refreshPendingCounts, [isAdmin]);
 
   const departments = useMemo(
     () => [...new Set(faculties.map((f) => f.department))].sort(),
@@ -75,6 +105,22 @@ export default function FacultyList() {
   }, [faculties, filters]);
 
   const handleBook = (faculty) => setBookingFaculty(faculty);
+  const handleEdit = (faculty) => setEditingFaculty(faculty);
+  const handleAdd = () => setEditingFaculty({});
+  const handleViewSchedule = (faculty) => {
+    setSelectedFaculty(null);
+    setScheduleViewFaculty(faculty);
+  };
+  const handleCloseScheduleModal = () => {
+    setScheduleViewFaculty(null);
+    refreshPendingCounts();
+  };
+  const handleFacultySaved = (saved) =>
+    setFaculties((prev) =>
+      prev.some((f) => f.faculty_id === saved.faculty_id)
+        ? prev.map((f) => (f.faculty_id === saved.faculty_id ? saved : f))
+        : [...prev, saved]
+    );
 
   return (
     <div>
@@ -91,29 +137,73 @@ export default function FacultyList() {
         </p>
       </div>
 
-      <div className="flex items-center gap-2 border-b border-gray-200 mb-6">
-        <button
-          onClick={() => setActiveTab('directory')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-t-lg text-sm font-semibold transition-colors ${
-            activeTab === 'directory'
-              ? 'bg-[#80172B] text-white'
-              : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          <Users className="w-4 h-4" />
-          Faculty Roster Directory ({faculties.length})
-        </button>
-        {canManageBookings && (
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-200 mb-6">
+        <div className="flex items-center gap-2 overflow-x-auto">
+          {canViewDirectory && (
+            <button
+              onClick={() => setActiveTab('directory')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-t-lg text-sm font-semibold transition-colors shrink-0 whitespace-nowrap ${
+                activeTab === 'directory'
+                  ? 'bg-[#80172B] text-white'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Users className="w-4 h-4" />
+              Faculty Roster Directory ({faculties.length})
+            </button>
+          )}
+          {canManageBookings && (
+            <button
+              onClick={() => setActiveTab('bookings')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-t-lg text-sm font-semibold transition-colors shrink-0 whitespace-nowrap ${
+                activeTab === 'bookings'
+                  ? 'bg-[#80172B] text-white'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <CalendarClock className="w-4 h-4" />
+              My Consultation Bookings
+            </button>
+          )}
+          {canViewMyBookings && (
+            <button
+              onClick={() => setActiveTab('my-bookings')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-t-lg text-sm font-semibold transition-colors shrink-0 whitespace-nowrap ${
+                activeTab === 'my-bookings'
+                  ? 'bg-[#80172B] text-white'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <CalendarClock className="w-4 h-4" />
+              My Bookings
+            </button>
+          )}
+          {canManageAllBookings && (
+            <button
+              onClick={() => setActiveTab('all-bookings')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-t-lg text-sm font-semibold transition-colors shrink-0 whitespace-nowrap ${
+                activeTab === 'all-bookings'
+                  ? 'bg-[#80172B] text-white'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <ClipboardList className="w-4 h-4" />
+              All Consultation Bookings
+              {Object.values(pendingByFaculty).reduce((sum, n) => sum + n, 0) > 0 && (
+                <span className="bg-amber-100 text-amber-700 text-[11px] font-bold px-1.5 py-0.5 rounded-full">
+                  {Object.values(pendingByFaculty).reduce((sum, n) => sum + n, 0)}
+                </span>
+              )}
+            </button>
+          )}
+        </div>
+        {canEditFaculty && activeTab === 'directory' && (
           <button
-            onClick={() => setActiveTab('bookings')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-t-lg text-sm font-semibold transition-colors ${
-              activeTab === 'bookings'
-                ? 'bg-[#80172B] text-white'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
+            onClick={handleAdd}
+            className="flex items-center justify-center gap-1.5 bg-[#80172B] text-white text-sm font-semibold px-4 py-2 mb-2 rounded-lg hover:bg-[#651020] transition-colors shrink-0"
           >
-            <CalendarClock className="w-4 h-4" />
-            My Consultation Bookings
+            <UserPlus className="w-4 h-4" />
+            Add Teacher
           </button>
         )}
       </div>
@@ -195,7 +285,11 @@ export default function FacultyList() {
                       faculty={faculty}
                       onViewProfile={setSelectedFaculty}
                       onBook={handleBook}
+                      onEdit={handleEdit}
+                      onManageBookings={handleViewSchedule}
                       canBook={canBookConsultation}
+                      canEdit={canEditFaculty}
+                      pendingCount={pendingByFaculty[faculty.faculty_id] || 0}
                     />
                   ))}
                 </div>
@@ -203,12 +297,23 @@ export default function FacultyList() {
             </>
           )}
         </>
-      ) : (
+      ) : activeTab === 'bookings' ? (
         canManageBookings && <TeacherBookingsDashboard />
+      ) : activeTab === 'all-bookings' ? (
+        canManageAllBookings && <AdminBookingsPanel onBookingChanged={refreshPendingCounts} />
+      ) : (
+        canViewMyBookings && <MyBookingsPanel />
       )}
 
-      <FacultyProfileModal faculty={selectedFaculty} onClose={() => setSelectedFaculty(null)} />
+      <FacultyProfileModal
+        faculty={selectedFaculty}
+        onClose={() => setSelectedFaculty(null)}
+        isAdmin={isAdmin}
+        onViewSchedule={handleViewSchedule}
+      />
       <BookingRequestModal faculty={bookingFaculty} onClose={() => setBookingFaculty(null)} />
+      <FacultyEditModal faculty={editingFaculty} onClose={() => setEditingFaculty(null)} onSaved={handleFacultySaved} />
+      <FacultyScheduleModal faculty={scheduleViewFaculty} onClose={handleCloseScheduleModal} />
     </div>
   );
 }
