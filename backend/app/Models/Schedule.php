@@ -20,11 +20,13 @@ class Schedule extends Model
         'day',
         'start_time',
         'end_time',
+        'archived_at',
     ];
 
     protected $casts = [
         'start_time' => 'datetime:H:i',
         'end_time' => 'datetime:H:i',
+        'archived_at' => 'datetime',
     ];
 
     public function getSubjectCodeAttribute(): ?string

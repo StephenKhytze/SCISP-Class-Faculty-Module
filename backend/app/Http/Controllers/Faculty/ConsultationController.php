@@ -24,6 +24,28 @@ class ConsultationController extends Controller
         return response()->json($query->get());
     }
 
+    public function all(Request $request)
+    {
+        $query = Consultation::with('faculty')->orderBy('consultation_date')->orderBy('consultation_time');
+
+        if ($status = $request->query('status')) {
+            $query->where('status', $status);
+        }
+
+        return response()->json($query->get());
+    }
+
+    public function mine(Request $request)
+    {
+        $consultations = Consultation::where('student_id', $request->user()->user_id)
+            ->with('faculty')
+            ->orderBy('consultation_date')
+            ->orderBy('consultation_time')
+            ->get();
+
+        return response()->json($consultations);
+    }
+
     public function store(Request $request, Faculty $faculty)
     {
         $data = $request->validate([

@@ -1,8 +1,17 @@
 import { useState } from 'react';
-import { MapPin, Mail, Clock, Tag, Copy, Check, UserRound, CalendarPlus } from 'lucide-react';
+import { MapPin, Mail, Clock, Tag, Copy, Check, UserRound, CalendarPlus, Pencil, Bell } from 'lucide-react';
 import { STATUS_STYLES, STATUS_DOT, statusLabel } from '../constants';
 
-export default function FacultyCard({ faculty, onViewProfile, onBook, canBook = true }) {
+export default function FacultyCard({
+  faculty,
+  onViewProfile,
+  onBook,
+  onEdit,
+  onManageBookings,
+  canBook = true,
+  canEdit = false,
+  pendingCount = 0,
+}) {
   const [copied, setCopied] = useState(false);
 
   const copyEmail = async () => {
@@ -26,6 +35,16 @@ export default function FacultyCard({ faculty, onViewProfile, onBook, canBook = 
           {statusLabel(faculty.availability_status, faculty.status_detail)}
         </span>
       </div>
+
+      {canEdit && pendingCount > 0 && (
+        <button
+          onClick={() => onManageBookings(faculty)}
+          className="w-full flex items-center justify-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold py-1.5 rounded-lg mb-3 hover:bg-amber-100 transition-colors"
+        >
+          <Bell className="w-3.5 h-3.5" />
+          {pendingCount} pending booking{pendingCount > 1 ? 's' : ''} &middot; Review now
+        </button>
+      )}
 
       <div className="flex items-center gap-3 mb-4">
         {faculty.faculty_image ? (
@@ -93,14 +112,24 @@ export default function FacultyCard({ faculty, onViewProfile, onBook, canBook = 
           <UserRound className="w-4 h-4" />
           View Profile
         </button>
-        {canBook && (
+        {canEdit ? (
           <button
-            onClick={() => onBook(faculty)}
+            onClick={() => onEdit(faculty)}
             className="flex-1 flex items-center justify-center gap-1.5 bg-[#80172B] text-white text-sm font-medium py-2 rounded-lg hover:bg-[#651020] transition-colors"
           >
-            <CalendarPlus className="w-4 h-4" />
-            Book
+            <Pencil className="w-4 h-4" />
+            Edit
           </button>
+        ) : (
+          canBook && (
+            <button
+              onClick={() => onBook(faculty)}
+              className="flex-1 flex items-center justify-center gap-1.5 bg-[#80172B] text-white text-sm font-medium py-2 rounded-lg hover:bg-[#651020] transition-colors"
+            >
+              <CalendarPlus className="w-4 h-4" />
+              Book
+            </button>
+          )
         )}
       </div>
     </div>

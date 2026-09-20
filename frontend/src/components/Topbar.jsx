@@ -23,7 +23,7 @@ export default function Topbar({
   ];
 
   return (
-    <header className="h-[86px] bg-[#80172B] text-white flex items-center justify-between pr-8 select-none relative z-30 shadow-md border-b-2 border-[#651020]" style={{ paddingLeft: '32px' }}>
+    <header className="print:hidden h-[86px] bg-[#80172B] text-white flex items-center justify-between pr-8 select-none relative z-30 shadow-md border-b-2 border-[#651020]" style={{ paddingLeft: '32px' }}>
       {/* Left: Mobile menu toggle + ABC SCHOOL Brand Logo */}
       <div className="flex items-center space-x-3">
         <button
@@ -105,7 +105,6 @@ export default function Topbar({
           )}
         </div>
 
-        {/* Divider + Persona Profile - hidden on mobile, shown in the sidebar drawer instead */}
         <div className="hidden md:flex items-center space-x-5 sm:space-x-6">
         <div className="h-7 w-[1px] bg-white/20" />
 
@@ -140,8 +139,24 @@ export default function Topbar({
             <div className="absolute right-0 mt-2 w-64 bg-white text-gray-800 rounded-lg shadow-xl border border-gray-200 py-2 z-50 animate-in fade-in duration-150">
               <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50/80">
                 <p className="text-xs font-semibold text-gray-900">{currentUser.name}</p>
-                <p className="text-[11px] text-gray-500">{currentUser.department}</p>
+                {!(currentUser.level || currentUser.year) && (
+                  <p className="text-[11px] text-gray-500">{currentUser.department}</p>
+                )}
                 <p className="text-[10px] text-[#80172B] font-mono mt-0.5">ID: {currentUser.idNumber}</p>
+                {(currentUser.level || currentUser.year) && (
+                  <div className="flex flex-wrap gap-1 mt-1.5">
+                    {currentUser.level && (
+                      <span className="inline-flex items-center bg-[#80172B]/10 text-[#80172B] text-[10px] font-bold px-1.5 py-0.5 rounded">
+                        {currentUser.level}
+                      </span>
+                    )}
+                    {currentUser.year && (
+                      <span className="inline-flex items-center bg-[#182848]/10 text-[#182848] text-[10px] font-bold px-1.5 py-0.5 rounded">
+                        {currentUser.year}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="px-3 py-1.5 text-[10px] uppercase font-bold text-gray-400 tracking-wider">

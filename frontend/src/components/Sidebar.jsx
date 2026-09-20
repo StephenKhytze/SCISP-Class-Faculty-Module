@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Calendar, Monitor, BookOpen, GraduationCap, Users, LogOut, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Home, Calendar, Monitor, BookOpen, GraduationCap, Users, LogOut, ArrowLeft, ArrowRight, X } from 'lucide-react';
 
 export default function Sidebar({ isMobileOpen = false, onCloseMobileNav = () => {}, currentUser }) {
   const location = useLocation();
@@ -17,33 +17,54 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobileNav = () =>
 
   return (
     <>
-      {/* Backdrop for the mobile drawer - covers the whole viewport (header included) so tapping anything outside the drawer closes it */}
-      {isMobileOpen && (
-        <div
-          className="fixed inset-0 bg-black/40 z-40 md:hidden"
-          onClick={onCloseMobileNav}
-        />
-      )}
+      <div
+        className={`print:hidden fixed inset-0 bg-black/40 z-40 md:hidden transition-opacity duration-300 ease-in-out ${
+          isMobileOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+        onClick={onCloseMobileNav}
+        aria-hidden="true"
+      />
 
       <aside
-        className={`fixed md:relative top-[86px] md:top-0 left-0 z-40 w-[280px] ${
+        className={`print:hidden fixed md:relative top-0 left-0 z-40 w-[280px] ${
           isCollapsed ? 'md:w-[100px]' : 'md:w-[280px]'
-        } bg-[#80172B] text-white flex flex-col h-[calc(100vh-86px)] shrink-0 transition-all duration-300 ease-in-out overflow-hidden md:overflow-visible ${
+        } bg-[#80172B] text-white flex flex-col h-screen md:h-[calc(100vh-86px)] shrink-0 transition-transform duration-300 ease-in-out md:transition-[width] overflow-hidden md:overflow-visible ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
         } md:translate-x-0`}
       >
-        {/* Profile header (mobile only) - the topbar avatar is hidden on mobile, so it lives here instead */}
-        <div className="md:hidden flex items-center gap-3 px-5 pt-5 pb-4 border-b border-[#651020]">
-          <div className="w-11 h-11 rounded-full bg-white flex items-center justify-center shadow-md text-[#182848] shrink-0">
-            <GraduationCap className="w-6 h-6 text-[#182848]" />
+        <div className="md:hidden flex items-center justify-between gap-3 px-5 pt-5 pb-4 border-b border-[#651020]">
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="w-11 h-11 rounded-full bg-white flex items-center justify-center shadow-md text-[#182848] shrink-0">
+              <GraduationCap className="w-6 h-6 text-[#182848]" />
+            </div>
+            <div className="leading-tight overflow-hidden">
+              <p className="font-bold text-[15px] text-white truncate">{currentUser?.name}</p>
+              <p className="text-[12px] text-white/70">{currentUser?.role}</p>
+              {(currentUser?.level || currentUser?.year) && (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {currentUser.level && (
+                    <span className="inline-flex items-center bg-white/15 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
+                      {currentUser.level}
+                    </span>
+                  )}
+                  {currentUser.year && (
+                    <span className="inline-flex items-center bg-white/15 text-white text-[9px] font-bold px-1.5 py-0.5 rounded">
+                      {currentUser.year}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-          <div className="leading-tight overflow-hidden">
-            <p className="font-bold text-[15px] text-white truncate">{currentUser?.name}</p>
-            <p className="text-[12px] text-white/70">{currentUser?.role}</p>
-          </div>
+          <button
+            onClick={onCloseMobileNav}
+            className="text-white hover:bg-white/10 p-1.5 rounded transition-colors focus:outline-none shrink-0"
+            title="Close Menu"
+          >
+            <X className="w-6 h-6 text-white/80" />
+          </button>
         </div>
 
-        {/* Collapse arrow at the top right of sidebar (desktop only) */}
         <div className={`hidden md:flex ${isCollapsed ? 'justify-center' : 'justify-end'} p-5 transition-all duration-300`}>
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
@@ -54,7 +75,6 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobileNav = () =>
           </button>
         </div>
 
-      {/* Navigation Links */}
       <nav className="flex-1 flex flex-col space-y-1.5 mt-2">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
@@ -83,7 +103,6 @@ export default function Sidebar({ isMobileOpen = false, onCloseMobileNav = () =>
         })}
       </nav>
 
-      {/* Sign Out Button at the bottom */}
       <div className="mt-auto border-t border-[#651020] pt-4 pb-6">
         <Link
           to="/auth"

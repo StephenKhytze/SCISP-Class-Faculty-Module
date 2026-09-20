@@ -42,6 +42,10 @@ Route::middleware('auth.jwt')->group(function () {
     */
     Route::prefix('schedule')->group(function () {
         Route::get('/', [ScheduleController::class, 'index']);
+        Route::post('/', [ScheduleController::class, 'store']);
+        Route::put('/{schedule}', [ScheduleController::class, 'update']);
+        Route::patch('/{schedule}/archive', [ScheduleController::class, 'archive']);
+        Route::patch('/{schedule}/restore', [ScheduleController::class, 'restore']);
         // Group 2: Add more schedule routes here
     });
 
@@ -77,12 +81,16 @@ Route::middleware('auth.jwt')->group(function () {
 
     Route::prefix('faculty')->group(function () {
         Route::get('/', [FacultyController::class, 'index']);
+        Route::post('/', [FacultyController::class, 'store']);
         Route::get('/me', [FacultyController::class, 'me']);
         Route::get('/{faculty}', [FacultyController::class, 'show']);
+        Route::put('/{faculty}', [FacultyController::class, 'update']);
         Route::get('/{faculty}/consultations', [ConsultationController::class, 'index']);
         Route::post('/{faculty}/consultations', [ConsultationController::class, 'store']);
         // Group 5: Add more faculty routes here
     });
 
+    Route::get('/consultations', [ConsultationController::class, 'all']);
+    Route::get('/consultations/me', [ConsultationController::class, 'mine']);
     Route::patch('/consultations/{consultation}', [ConsultationController::class, 'updateStatus']);
 });

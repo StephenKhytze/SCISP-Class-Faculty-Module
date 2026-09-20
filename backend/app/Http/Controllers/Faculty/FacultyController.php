@@ -45,6 +45,54 @@ class FacultyController extends Controller
         return response()->json($faculty);
     }
 
+    public function store(Request $request)
+    {
+        $data = $request->validate([
+            'first_name' => 'required|string',
+            'middle_name' => 'nullable|string',
+            'last_name' => 'required|string',
+            'department' => 'required|string',
+            'email_address' => 'required|email',
+            'position' => 'required|string',
+            'college' => 'required|string',
+            'building' => 'required|string',
+            'room' => 'required|string',
+            'local_ext' => 'nullable|string',
+            'office_hours' => 'nullable|string',
+            'specializations' => 'nullable|array',
+            'availability_status' => 'required|in:available,in_class,off_campus,consultation_hours,on_leave',
+            'status_detail' => 'nullable|string',
+        ]);
+
+        $faculty = Faculty::create($data);
+
+        return response()->json($faculty, 201);
+    }
+
+    public function update(Request $request, Faculty $faculty)
+    {
+        $data = $request->validate([
+            'first_name' => 'required|string',
+            'middle_name' => 'nullable|string',
+            'last_name' => 'required|string',
+            'department' => 'required|string',
+            'email_address' => 'required|email',
+            'position' => 'required|string',
+            'college' => 'required|string',
+            'building' => 'required|string',
+            'room' => 'required|string',
+            'local_ext' => 'nullable|string',
+            'office_hours' => 'nullable|string',
+            'specializations' => 'nullable|array',
+            'availability_status' => 'required|in:available,in_class,off_campus,consultation_hours,on_leave',
+            'status_detail' => 'nullable|string',
+        ]);
+
+        $faculty->update($data);
+
+        return response()->json($faculty);
+    }
+
     public function me(Request $request)
     {
         $faculty = Faculty::where('user_id', $request->user()->user_id)->first();

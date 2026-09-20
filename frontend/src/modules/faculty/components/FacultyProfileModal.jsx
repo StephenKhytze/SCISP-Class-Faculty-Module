@@ -1,7 +1,7 @@
-import { X, MapPin, Mail, Clock, Tag, UserRound } from 'lucide-react';
+import { X, MapPin, Mail, Clock, Tag, UserRound, CalendarDays } from 'lucide-react';
 import { STATUS_STYLES, STATUS_DOT, statusLabel } from '../constants';
 
-export default function FacultyProfileModal({ faculty, onClose }) {
+export default function FacultyProfileModal({ faculty, onClose, isAdmin = false, onViewSchedule }) {
   if (!faculty) return null;
 
   return (
@@ -73,6 +73,18 @@ export default function FacultyProfileModal({ faculty, onClose }) {
                 </span>
               ))}
             </div>
+          </div>
+        )}
+
+        {isAdmin && (
+          <div className="flex gap-2 mt-5 pt-5 border-t border-gray-100">
+            <button
+              onClick={() => onViewSchedule(faculty)}
+              className="flex-1 flex items-center justify-center gap-1.5 bg-[#80172B] text-white text-sm font-medium py-2 rounded-lg hover:bg-[#651020] transition-colors"
+            >
+              <CalendarDays className="w-4 h-4" />
+              Schedule &amp; Bookings
+            </button>
           </div>
         )}
       </div>

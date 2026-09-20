@@ -44,12 +44,16 @@ class AuthController extends Controller
         $role = 'Student';
         $department = 'IT';
         $idNumber = '99999';
+        $level = null;
+        $year = null;
 
         if ($user->username === 'DelaCruz_Juan_C1234') {
             $name = 'Juan Dela Cruz';
             $role = 'Student';
             $department = 'IT';
             $idNumber = '12345';
+            $level = 'BSIT';
+            $year = '3rd Year';
         } elseif ($user->username === 'Admin_User_00001') {
             $name = 'Admin User';
             $role = 'Admin';
@@ -60,6 +64,14 @@ class AuthController extends Controller
             $role = $user->role === 'administrator' ? 'Admin' : ($user->role === 'faculty' ? 'Teacher' : 'Student');
             $department = $user->role === 'administrator' ? 'Administration' : 'Academic';
             $idNumber = (string)(10000 + $user->user_id);
+
+            if ($user->role === 'faculty') {
+                $linkedFaculty = \App\Models\Faculty::where('user_id', $user->user_id)->first();
+                if ($linkedFaculty) {
+                    $name = $linkedFaculty->name;
+                    $department = $linkedFaculty->department;
+                }
+            }
         }
 
         try {
@@ -68,6 +80,8 @@ class AuthController extends Controller
                 'role' => $role,
                 'department' => $department,
                 'idNumber' => $idNumber,
+                'level' => $level,
+                'year' => $year,
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -83,6 +97,8 @@ class AuthController extends Controller
                 'role' => $role,
                 'department' => $department,
                 'idNumber' => $idNumber,
+                'level' => $level,
+                'year' => $year,
             ]
         ]);
     }
