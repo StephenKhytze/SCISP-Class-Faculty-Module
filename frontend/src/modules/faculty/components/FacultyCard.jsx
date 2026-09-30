@@ -42,7 +42,7 @@ export default function FacultyCard({
           className="w-full flex items-center justify-center gap-1.5 bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold py-1.5 rounded-lg mb-3 hover:bg-amber-100 transition-colors"
         >
           <Bell className="w-3.5 h-3.5" />
-          {pendingCount} pending booking{pendingCount > 1 ? 's' : ''} &middot; Review now
+          {pendingCount} pending appointment{pendingCount > 1 ? 's' : ''} &middot; Review now
         </button>
       )}
 
@@ -127,7 +127,7 @@ export default function FacultyCard({
               className="flex-1 flex items-center justify-center gap-1.5 bg-[#80172B] text-white text-sm font-medium py-2 rounded-lg hover:bg-[#651020] transition-colors"
             >
               <CalendarPlus className="w-4 h-4" />
-              Book
+              Book Appointment
             </button>
           )
         )}

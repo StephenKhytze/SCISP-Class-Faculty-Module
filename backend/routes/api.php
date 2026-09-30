@@ -6,11 +6,17 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Home\DashboardController;
 use App\Http\Controllers\Schedule\ScheduleController;
+use App\Http\Controllers\Schedule\CourseController;
+use App\Http\Controllers\Schedule\ClassSectionController;
+use App\Http\Controllers\Schedule\SubjectController;
+use App\Http\Controllers\Schedule\RoomController;
+use App\Http\Controllers\Schedule\RoomTypeController;
 use App\Http\Controllers\Announcements\AnnouncementController;
 use App\Http\Controllers\Library\LibraryController;
 use App\Http\Controllers\StudentInfo\StudentController;
 use App\Http\Controllers\Faculty\FacultyController;
 use App\Http\Controllers\Faculty\ConsultationController;
+use App\Http\Controllers\Faculty\LeaveRequestController;
 
 Route::get('/test', function () {
     return response()->json([
@@ -47,6 +53,41 @@ Route::middleware('auth.jwt')->group(function () {
         Route::patch('/{schedule}/archive', [ScheduleController::class, 'archive']);
         Route::patch('/{schedule}/restore', [ScheduleController::class, 'restore']);
         // Group 2: Add more schedule routes here
+    });
+
+    Route::prefix('courses')->group(function () {
+        Route::get('/', [CourseController::class, 'index']);
+        Route::post('/', [CourseController::class, 'store']);
+    });
+
+    Route::prefix('class-sections')->group(function () {
+        Route::get('/', [ClassSectionController::class, 'index']);
+        Route::post('/', [ClassSectionController::class, 'store']);
+        Route::patch('/{classSection}/archive', [ClassSectionController::class, 'archive']);
+        Route::patch('/{classSection}/restore', [ClassSectionController::class, 'restore']);
+    });
+
+    Route::prefix('subjects')->group(function () {
+        Route::get('/', [SubjectController::class, 'index']);
+        Route::post('/', [SubjectController::class, 'store']);
+        Route::put('/{subject}', [SubjectController::class, 'update']);
+        Route::patch('/{subject}/archive', [SubjectController::class, 'archive']);
+        Route::patch('/{subject}/restore', [SubjectController::class, 'restore']);
+    });
+
+    Route::prefix('rooms')->group(function () {
+        Route::get('/', [RoomController::class, 'index']);
+        Route::post('/', [RoomController::class, 'store']);
+        Route::put('/{room}', [RoomController::class, 'update']);
+        Route::patch('/{room}/archive', [RoomController::class, 'archive']);
+        Route::patch('/{room}/restore', [RoomController::class, 'restore']);
+    });
+
+    Route::prefix('room-types')->group(function () {
+        Route::get('/', [RoomTypeController::class, 'index']);
+        Route::post('/', [RoomTypeController::class, 'store']);
+        Route::patch('/{roomType}/archive', [RoomTypeController::class, 'archive']);
+        Route::patch('/{roomType}/restore', [RoomTypeController::class, 'restore']);
     });
 
     /*
@@ -93,4 +134,12 @@ Route::middleware('auth.jwt')->group(function () {
     Route::get('/consultations', [ConsultationController::class, 'all']);
     Route::get('/consultations/me', [ConsultationController::class, 'mine']);
     Route::patch('/consultations/{consultation}', [ConsultationController::class, 'updateStatus']);
+
+    Route::prefix('leave-requests')->group(function () {
+        Route::get('/', [LeaveRequestController::class, 'index']);
+        Route::get('/me', [LeaveRequestController::class, 'mine']);
+        Route::post('/', [LeaveRequestController::class, 'store']);
+        Route::patch('/{leaveRequest}/cancel', [LeaveRequestController::class, 'cancel']);
+        Route::patch('/{leaveRequest}', [LeaveRequestController::class, 'review']);
+    });
 });

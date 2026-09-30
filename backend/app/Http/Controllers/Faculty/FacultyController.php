@@ -8,6 +8,10 @@ use Illuminate\Http\Request;
 
 class FacultyController extends Controller
 {
+    // Grade 1-6 (Elementary), Grade 7-10 (Junior High School), Grade 11-12 (Senior High
+    // School) - matches BASIC_ED_YEAR_GROUPS on the frontend (schedule/constants.js).
+    private const GRADE_LABELS = 'Grade 1,Grade 2,Grade 3,Grade 4,Grade 5,Grade 6,Grade 7,Grade 8,Grade 9,Grade 10,Grade 11,Grade 12';
+
     public function index(Request $request)
     {
         $query = Faculty::query();
@@ -60,6 +64,10 @@ class FacultyController extends Controller
             'local_ext' => 'nullable|string',
             'office_hours' => 'nullable|string',
             'specializations' => 'nullable|array',
+            'teaching_levels' => 'nullable|array',
+            'teaching_levels.*' => 'in:College,Masteral,Elementary,Junior High School,Senior High School',
+            'teaching_grades' => 'nullable|array',
+            'teaching_grades.*' => 'in:' . self::GRADE_LABELS,
             'availability_status' => 'required|in:available,in_class,off_campus,consultation_hours,on_leave',
             'status_detail' => 'nullable|string',
         ]);
@@ -84,6 +92,10 @@ class FacultyController extends Controller
             'local_ext' => 'nullable|string',
             'office_hours' => 'nullable|string',
             'specializations' => 'nullable|array',
+            'teaching_levels' => 'nullable|array',
+            'teaching_levels.*' => 'in:College,Masteral,Elementary,Junior High School,Senior High School',
+            'teaching_grades' => 'nullable|array',
+            'teaching_grades.*' => 'in:' . self::GRADE_LABELS,
             'availability_status' => 'required|in:available,in_class,off_campus,consultation_hours,on_leave',
             'status_detail' => 'nullable|string',
         ]);

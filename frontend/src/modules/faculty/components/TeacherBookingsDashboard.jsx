@@ -37,7 +37,7 @@ export default function TeacherBookingsDashboard() {
         setBookings(bookingData);
         setSchedule(scheduleData);
       })
-      .catch(() => setError('Unable to load consultation bookings.'))
+      .catch(() => setError('Unable to load consultation appointments.'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -56,10 +56,10 @@ export default function TeacherBookingsDashboard() {
     api
       .patch(`/consultations/${consultationId}`, { status })
       .then((res) => setBookings((prev) => prev.map((b) => (b.consultation_id === consultationId ? res.data : b))))
-      .catch(() => setError('Unable to update that booking.'));
+      .catch(() => setError('Unable to update that appointment.'));
   };
 
-  if (loading) return <p className="text-sm text-gray-500">Loading consultation bookings...</p>;
+  if (loading) return <p className="text-sm text-gray-500">Loading consultation appointments...</p>;
   if (error) return <p className="text-sm text-rose-600">{error}</p>;
   if (!faculty) return <p className="text-sm text-gray-500">No faculty profile is linked to your account yet.</p>;
 

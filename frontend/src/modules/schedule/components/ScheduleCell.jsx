@@ -22,9 +22,9 @@ export default function ScheduleCell({ entries, onSelectEntry, isAdmin = false, 
               {entry.hasConflict && (
                 <div
                   className="flex items-center gap-1 mb-1 text-rose-700"
-                  title={`Room conflict with ${entry.conflicts
+                  title={`Conflict with ${entry.conflicts
                     .map((c) => `${c.subject_code}${[c.level, c.year].filter(Boolean).length ? ` (${[c.level, c.year].filter(Boolean).join(' ')})` : ''}`)
-                    .join(', ')} — same room, overlapping time.`}
+                    .join(', ')} — ${entry.conflictReason || 'overlapping time'}.`}
                 >
                   <AlertTriangle className="w-3.5 h-3.5 shrink-0 hidden sm:block" />
                   <span className="text-[10px] font-extrabold uppercase tracking-wide hidden sm:inline">Conflict</span>

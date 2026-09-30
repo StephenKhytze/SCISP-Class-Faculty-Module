@@ -1,15 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { X, Save, AlertTriangle } from 'lucide-react';
 import api from '../../../services/api';
-import { DAYS } from '../constants';
+import { DAYS, SCHEDULE_DAYS } from '../constants';
 import { to12Hour } from '../../faculty/officeHours';
+import RoomCombobox from './RoomCombobox';
 
 const FIELD_DEFAULTS = {
   subject_id: '',
   subject_code: '',
   subject_name: '',
   faculty_id: '',
-  room: '',
+  room_id: '',
   day: DAYS[0],
   start_time: '',
   end_time: '',
@@ -18,9 +19,20 @@ const FIELD_DEFAULTS = {
 // The education level / course / year / strand / section are no longer editable here -
 // they're inherited from the timetable the admin is already viewing (passed in as
 // `context`), so every class added stays correctly scoped to that section by construction.
-export default function ScheduleEditModal({ schedule, subjects = [], allSchedules = [], context, onClose, onSaved }) {
+export default function ScheduleEditModal({
+  schedule,
+  allSchedules = [],
+  faculties = [],
+  rooms = [],
+  subjectScopeContext,
+  context,
+  onClose,
+  onSaved,
+  onOpenManageSubjects,
+  onOpenManageRooms,
+}) {
   const [form, setForm] = useState(FIELD_DEFAULTS);
-  const [faculties, setFaculties] = useState([]);
+  const [scopedSubjects, setScopedSubjects] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
@@ -32,7 +44,7 @@ export default function ScheduleEditModal({ schedule, subjects = [], allSchedule
     () =>
       allSchedules
         .filter((s) => String(s.faculty_id) === String(form.faculty_id) && s.schedule_id !== schedule?.schedule_id)
-        .sort((a, b) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day) || a.start_time.localeCompare(b.start_time)),
+        .sort((a, b) => SCHEDULE_DAYS.indexOf(a.day) - SCHEDULE_DAYS.indexOf(b.day) || a.start_time.localeCompare(b.start_time)),
     [allSchedules, form.faculty_id, schedule]
   );
 
@@ -46,18 +58,18 @@ export default function ScheduleEditModal({ schedule, subjects = [], allSchedule
   }, [facultySchedule, form.day, form.start_time, form.end_time]);
 
   const roomConflict = useMemo(() => {
-    if (!form.room?.trim() || !form.day || !form.start_time || !form.end_time) return null;
+    if (!form.room_id || !form.day || !form.start_time || !form.end_time) return null;
     return (
       allSchedules.find(
         (s) =>
           s.schedule_id !== schedule?.schedule_id &&
-          s.room?.trim().toLowerCase() === form.room.trim().toLowerCase() &&
+          String(s.room_id) === String(form.room_id) &&
           s.day === form.day &&
           form.start_time < s.end_time &&
           form.end_time > s.start_time
       ) || null
     );
-  }, [allSchedules, form.room, form.day, form.start_time, form.end_time, schedule]);
+  }, [allSchedules, form.room_id, form.day, form.start_time, form.end_time, schedule]);
 
   useEffect(() => {
     if (!schedule) return;
@@ -66,7 +78,7 @@ export default function ScheduleEditModal({ schedule, subjects = [], allSchedule
       subject_code: schedule.subject_code || '',
       subject_name: schedule.subject_name || '',
       faculty_id: schedule.faculty_id || '',
-      room: schedule.room || '',
+      room_id: schedule.room_id || '',
       day: schedule.day || DAYS[0],
       start_time: schedule.start_time || '',
       end_time: schedule.end_time || '',
@@ -75,24 +87,68 @@ export default function ScheduleEditModal({ schedule, subjects = [], allSchedule
   }, [schedule]);
 
   useEffect(() => {
-    if (!schedule) return;
+    if (!schedule || !subjectScopeContext) return;
     api
-      .get('/faculty')
-      .then((res) => setFaculties(res.data))
-      .catch(() => setFaculties([]));
-  }, [schedule]);
+      .get('/subjects', { params: subjectScopeContext })
+      .then((res) => setScopedSubjects(res.data))
+      .catch(() => setScopedSubjects([]));
+  }, [schedule, subjectScopeContext?.course_id, subjectScopeContext?.year_label, subjectScopeContext?.strand]);
+
+  // Falls back to the entry's own saved context when editing, in case it was opened
+  // some other way than from its matching timetable. Computed unconditionally (before the
+  // early return below) since contextSubjects, a hook, depends on it.
+  const effectiveContext = useMemo(() => {
+    if (context) return context;
+    if (!schedule) return {};
+    return {
+      education_level: schedule.education_level,
+      level: schedule.level,
+      year: schedule.year,
+      strand: schedule.strand,
+      section: schedule.section,
+    };
+  }, [context, schedule]);
+
+  // Subjects already taught in this exact scope (same education level/level/year/strand),
+  // read straight off the live timetable rather than the `subjects` prop, which is every
+  // subject ever scheduled system-wide - without this, a Basic Ed Grade 1 class would see
+  // College/Masteral subjects in its suggestions the moment no subject has been explicitly
+  // assigned via Manage Subjects yet (scopedSubjects empty).
+  const contextSubjects = useMemo(() => {
+    const map = new Map();
+    allSchedules.forEach((s) => {
+      if (!s.subject_id) return;
+      if (s.education_level !== effectiveContext.education_level) return;
+      if (s.level !== effectiveContext.level) return;
+      if (s.year !== effectiveContext.year) return;
+      if (effectiveContext.strand && s.strand !== effectiveContext.strand) return;
+      if (!map.has(s.subject_id)) {
+        map.set(s.subject_id, { subject_id: s.subject_id, subject_code: s.subject_code, subject_name: s.subject_name });
+      }
+    });
+    return [...map.values()];
+  }, [allSchedules, effectiveContext]);
 
   if (!schedule) return null;
 
-  // Falls back to the entry's own saved context when editing, in case it was opened
-  // some other way than from its matching timetable.
-  const effectiveContext = context || {
-    education_level: schedule.education_level,
-    level: schedule.level,
-    year: schedule.year,
-    strand: schedule.strand,
-    section: schedule.section,
-  };
+  // Basic Ed stores its level (Elementary/JHS/SHS) in `level`, everyone else in
+  // `education_level` - either way it's what a teacher's teaching_levels are checked
+  // against. Faculty with no teaching_levels set yet are shown too, so a newly-added
+  // teacher isn't invisible until someone remembers to tag them.
+  const requiredTeachingLevel = effectiveContext.education_level === 'Basic Ed' ? effectiveContext.level : effectiveContext.education_level;
+  // Basic Ed classroom teachers are usually tied to one specific grade, not every grade
+  // within their level (a Grade 1 teacher shouldn't show up for a Grade 4 section). Only
+  // Basic Ed has this extra narrowing - College/Masteral has no "grade" concept here.
+  const requiredGrade = effectiveContext.education_level === 'Basic Ed' ? effectiveContext.year : null;
+  const availableFaculties = faculties.filter((f) => {
+    const levelOk = !f.teaching_levels || f.teaching_levels.length === 0 || f.teaching_levels.includes(requiredTeachingLevel);
+    if (!levelOk) return false;
+    if (!requiredGrade) return true;
+    return !f.teaching_grades || f.teaching_grades.length === 0 || f.teaching_grades.includes(requiredGrade);
+  });
+
+  const subjectOptions = scopedSubjects.length > 0 ? scopedSubjects : contextSubjects;
+
   const contextLabel = [
     effectiveContext.education_level,
     effectiveContext.level,
@@ -105,14 +161,23 @@ export default function ScheduleEditModal({ schedule, subjects = [], allSchedule
 
   const update = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }));
 
-  const handleSubjectCodeChange = (e) => {
-    const code = e.target.value;
-    const match = subjects.find((s) => s.subject_code.toLowerCase() === code.toLowerCase());
+  // A subject must already exist in the catalog (added via Manage Subjects) - picking one
+  // here just fills in its code/name, it never creates a new one on the fly.
+  const handleSubjectSelect = (e) => {
+    const id = e.target.value;
+    const match = subjectOptions.find((s) => String(s.subject_id) === id);
+    // Auto-fill Room from the most recent class taught under this subject, but only
+    // when the admin hasn't already picked one themselves.
+    const lastRoomIdForSubject = match
+      ? [...allSchedules].reverse().find((s) => s.subject_id === match.subject_id && s.room_id)?.room_id
+      : null;
+
     setForm((f) => ({
       ...f,
-      subject_code: code,
-      subject_name: match ? match.subject_name : f.subject_name,
-      subject_id: match ? match.subject_id : '',
+      subject_id: id,
+      subject_code: match ? match.subject_code : '',
+      subject_name: match ? match.subject_name : '',
+      room_id: !f.room_id && lastRoomIdForSubject ? lastRoomIdForSubject : f.room_id,
     }));
   };
 
@@ -121,10 +186,11 @@ export default function ScheduleEditModal({ schedule, subjects = [], allSchedule
     setError(null);
     setSubmitting(true);
 
-    const { subject_id, subject_code, subject_name, ...rest } = form;
+    // subject_code/subject_name are only kept in form state for display - the backend
+    // only wants subject_id now that a subject must already exist in the catalog.
+    const { subject_code: _subjectCode, subject_name: _subjectName, ...rest } = form;
     const payload = {
       ...rest,
-      ...(subject_id ? { subject_id } : { new_subject_code: subject_code, new_subject_name: subject_name }),
       education_level: effectiveContext.education_level,
       level: effectiveContext.level,
       year: effectiveContext.year,
@@ -168,31 +234,36 @@ export default function ScheduleEditModal({ schedule, subjects = [], allSchedule
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="text-[11px] font-semibold text-gray-400 uppercase">Subject Code</label>
-              <input
-                list="subject-code-options"
-                type="text"
-                value={form.subject_code}
-                onChange={handleSubjectCodeChange}
+          <div>
+            <label className="text-[11px] font-semibold text-gray-400 uppercase">Subject</label>
+            {subjectOptions.length === 0 ? (
+              <div className="mt-1 border border-dashed border-gray-300 rounded-lg p-3 bg-gray-50">
+                <p className="text-xs text-gray-500">
+                  No subjects are set up yet for {contextLabel || 'this section'}. Add one from Manage Subjects first.
+                </p>
+                {onOpenManageSubjects && (
+                  <button
+                    type="button"
+                    onClick={onOpenManageSubjects}
+                    className="text-xs font-semibold text-[#80172B] hover:underline mt-1"
+                  >
+                    Open Manage Subjects
+                  </button>
+                )}
+              </div>
+            ) : (
+              <select
+                value={form.subject_id}
+                onChange={handleSubjectSelect}
                 required
-                placeholder="Type new or pick existing"
-                className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#80172B]/30"
-              />
-              <datalist id="subject-code-options">
-                {subjects.map((s) => (
-                  <option key={s.subject_id} value={s.subject_code}>{s.subject_name}</option>
+                className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#80172B]/30"
+              >
+                <option value="" disabled>Select subject</option>
+                {subjectOptions.map((s) => (
+                  <option key={s.subject_id} value={s.subject_id}>{s.subject_code} — {s.subject_name}</option>
                 ))}
-              </datalist>
-            </div>
-            <Field
-              label="Subject Name"
-              value={form.subject_name}
-              onChange={update('subject_name')}
-              required
-              placeholder="e.g. Integrative Programming & Technologies 2"
-            />
+              </select>
+            )}
           </div>
 
           <div>
@@ -204,10 +275,15 @@ export default function ScheduleEditModal({ schedule, subjects = [], allSchedule
               className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#80172B]/30"
             >
               <option value="" disabled>Select faculty</option>
-              {faculties.map((f) => (
+              {availableFaculties.map((f) => (
                 <option key={f.faculty_id} value={f.faculty_id}>{f.name} — {f.position}</option>
               ))}
             </select>
+            {availableFaculties.length === 0 && (
+              <p className="text-xs text-amber-600 mt-1">
+                No faculty is tagged to teach {requiredGrade ? `${requiredTeachingLevel} ${requiredGrade}` : requiredTeachingLevel || 'this level'} yet. Set a teacher's teaching levels/grades from Edit Teacher.
+              </p>
+            )}
 
             {form.faculty_id && (
               <div className="mt-2 border border-gray-200 rounded-lg p-3 bg-gray-50">
@@ -239,12 +315,20 @@ export default function ScheduleEditModal({ schedule, subjects = [], allSchedule
                 onChange={update('day')}
                 className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#80172B]/30"
               >
-                {DAYS.map((d) => (
+                {(effectiveContext.education_level === 'Basic Ed' ? DAYS : SCHEDULE_DAYS).map((d) => (
                   <option key={d} value={d}>{d}</option>
                 ))}
               </select>
             </div>
-            <Field label="Room" value={form.room} onChange={update('room')} />
+            <div>
+              <label className="text-[11px] font-semibold text-gray-400 uppercase">Room</label>
+              <RoomCombobox
+                rooms={rooms}
+                value={form.room_id}
+                onSelect={(roomId) => setForm((f) => ({ ...f, room_id: roomId }))}
+                onOpenManageRooms={onOpenManageRooms}
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -285,7 +369,7 @@ export default function ScheduleEditModal({ schedule, subjects = [], allSchedule
             <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-lg p-3">
               <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
               <p className="text-xs text-amber-800">
-                Heads up: Room {form.room} is already booked for {roomConflict.subject_code}
+                Heads up: Room {roomConflict.room} is already booked for {roomConflict.subject_code}
                 {roomConflict.faculty && <> ({roomConflict.faculty.name})</>} on {form.day} from{' '}
                 {to12Hour(roomConflict.start_time)}-{to12Hour(roomConflict.end_time)}.
               </p>
@@ -313,22 +397,6 @@ export default function ScheduleEditModal({ schedule, subjects = [], allSchedule
           </div>
         </form>
       </div>
-    </div>
-  );
-}
-
-function Field({ label, value, onChange, placeholder, required = false }) {
-  return (
-    <div>
-      <label className="text-[11px] font-semibold text-gray-400 uppercase">{label}</label>
-      <input
-        type="text"
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        required={required}
-        className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#80172B]/30"
-      />
     </div>
   );
 }

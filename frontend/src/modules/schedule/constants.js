@@ -1,6 +1,11 @@
 export const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
-export const EDUCATION_LEVELS = ['College', 'Masteral', 'Basic Ed'];
+// Class Schedule only: College/Masteral (weekend/evening programs) can run Sunday classes,
+// unlike everything else that shares DAYS (Basic Ed, faculty booking grids, etc.), so this
+// stays a separate list instead of adding Sunday to DAYS itself.
+export const SCHEDULE_DAYS = [...DAYS, 'Sunday'];
+
+export const EDUCATION_LEVELS = ['Basic Ed', 'College', 'Masteral'];
 
 export const YEAR_LEVEL_OPTIONS = {
   College: ['1st Year', '2nd Year', '3rd Year', '4th Year'],
@@ -21,13 +26,33 @@ export function isSeniorHigh(year) {
   return SENIOR_HIGH_GRADES.includes(year);
 }
 
-export const TIME_SLOTS = [
-  { label: '7:00-9:00 AM', start: '07:00', end: '09:00' },
-  { label: '9:00-11:00 AM', start: '09:00', end: '11:00' },
-  { label: '11:00 AM-1:00 PM', start: '11:00', end: '13:00' },
-  { label: '1:00-3:00 PM', start: '13:00', end: '15:00' },
-  { label: '3:00-5:00 PM', start: '15:00', end: '17:00' },
-];
+// One-hour blocks, 7 AM - 5 PM. A class longer than an hour spans several of these
+// consecutively; the grid merges them into one visual cell (see slotsSpannedBy below)
+// instead of repeating the class in every block it touches.
+function hourLabel(h) {
+  const period = h >= 12 ? 'PM' : 'AM';
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  return `${hour12}:00 ${period}`;
+}
+
+export const TIME_SLOTS = Array.from({ length: 10 }, (_, i) => {
+  const startHour = 7 + i;
+  const endHour = startHour + 1;
+  const start = `${String(startHour).padStart(2, '0')}:00`;
+  const end = `${String(endHour).padStart(2, '0')}:00`;
+  return { label: `${hourLabel(startHour)} - ${hourLabel(endHour)}`, start, end };
+});
+
+// How many consecutive 1-hour TIME_SLOTS a class occupies, starting at the slot whose
+// `start` equals the class's start_time. Used as the <td rowSpan> for that cell so a
+// 2-hour class renders as one merged block instead of two separate ones.
+export function slotsSpannedBy(entry) {
+  const startIdx = TIME_SLOTS.findIndex((slot) => slot.start === entry.start_time);
+  if (startIdx === -1) return 1;
+  let count = 0;
+  for (let i = startIdx; i < TIME_SLOTS.length && TIME_SLOTS[i].start < entry.end_time; i++) count++;
+  return Math.max(count, 1);
+}
 
 export function currentDayName() {
   return DAYS[new Date().getDay() - 1] ?? null;

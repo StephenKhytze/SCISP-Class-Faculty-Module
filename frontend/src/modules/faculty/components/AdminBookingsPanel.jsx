@@ -15,7 +15,7 @@ export default function AdminBookingsPanel({ onBookingChanged }) {
     api
       .get('/consultations')
       .then((res) => setBookings(res.data))
-      .catch(() => setError('Unable to load consultation bookings.'))
+      .catch(() => setError('Unable to load consultation appointments.'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -26,7 +26,7 @@ export default function AdminBookingsPanel({ onBookingChanged }) {
         setBookings((prev) => prev.map((b) => (b.consultation_id === consultationId ? { ...b, ...res.data } : b)));
         onBookingChanged?.();
       })
-      .catch(() => setError('Unable to update that booking.'));
+      .catch(() => setError('Unable to update that appointment.'));
   };
 
   const teacherGroups = useMemo(() => {
@@ -57,7 +57,7 @@ export default function AdminBookingsPanel({ onBookingChanged }) {
     : teacherGroups.find((g) => String(g.faculty.faculty_id) === String(selectedTeacherId)) || null;
   const showingDetail = isAllView || Boolean(selectedGroup);
 
-  if (loading) return <p className="text-sm text-gray-500">Loading consultation bookings...</p>;
+  if (loading) return <p className="text-sm text-gray-500">Loading consultation appointments...</p>;
   if (error) return <p className="text-sm text-rose-600">{error}</p>;
 
   return (
@@ -68,7 +68,7 @@ export default function AdminBookingsPanel({ onBookingChanged }) {
         teacherGroups.length === 0 ? (
           <div className="bg-white border border-gray-200 rounded-xl p-10 text-center">
             <Inbox className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-            <p className="text-sm text-gray-500">No consultation bookings have been made yet.</p>
+            <p className="text-sm text-gray-500">No consultation appointments have been made yet.</p>
           </div>
         ) : (
           <>
@@ -122,7 +122,7 @@ export default function AdminBookingsPanel({ onBookingChanged }) {
                       <p className="font-bold text-gray-900 text-sm truncate">{faculty.name}</p>
                       <p className="text-xs text-gray-500 truncate">{faculty.department}</p>
                       <p className="text-xs text-gray-400 mt-0.5">
-                        {all.length} total booking{all.length !== 1 ? 's' : ''}
+                        {all.length} total appointment{all.length !== 1 ? 's' : ''}
                       </p>
                     </div>
                     {pending.length > 0 && (

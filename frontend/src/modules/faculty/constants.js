@@ -47,3 +47,26 @@ export const BOOKING_CHIP_STYLES = {
   declined: 'bg-rose-100 text-rose-800',
   completed: 'bg-sky-100 text-sky-800',
 };
+
+export const LEAVE_STATUS_LABELS = {
+  pending: 'Pending',
+  approved: 'Approved',
+  declined: 'Declined',
+  cancelled: 'Cancelled',
+};
+
+export const LEAVE_STATUS_STYLES = {
+  pending: 'bg-amber-50 text-amber-700 border-amber-200',
+  approved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  declined: 'bg-rose-50 text-rose-700 border-rose-200',
+  cancelled: 'bg-slate-100 text-slate-500 border-slate-200',
+};
+
+export function formatLeaveRange(start, end) {
+  const fmt = (d) => new Date(`${d}T00:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  return start === end ? fmt(start) : `${fmt(start)} – ${fmt(end)}`;
+}
+
+export function leaveDayCount(start, end) {
+  return Math.round((new Date(`${end}T00:00:00`) - new Date(`${start}T00:00:00`)) / 86400000) + 1;
+}

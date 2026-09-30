@@ -26,12 +26,16 @@ class Faculty extends Model
         'local_ext',
         'office_hours',
         'specializations',
+        'teaching_levels',
+        'teaching_grades',
         'availability_status',
         'status_detail',
     ];
 
     protected $casts = [
         'specializations' => 'array',
+        'teaching_levels' => 'array',
+        'teaching_grades' => 'array',
     ];
 
     public function getNameAttribute(): string
@@ -52,6 +56,11 @@ class Faculty extends Model
     public function consultations()
     {
         return $this->hasMany(Consultation::class, 'faculty_id', 'faculty_id');
+    }
+
+    public function leaveRequests()
+    {
+        return $this->hasMany(LeaveRequest::class, 'faculty_id', 'faculty_id');
     }
 
     public function consultationHours()

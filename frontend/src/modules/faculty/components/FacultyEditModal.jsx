@@ -3,6 +3,10 @@ import { X, Save } from 'lucide-react';
 import api from '../../../services/api';
 import { STATUS_LABELS, STATUS_STYLES, STATUS_DOT, statusLabel } from '../constants';
 import { DAY_OPTIONS, parseOfficeHours, formatOfficeHours } from '../officeHours';
+import { BASIC_ED_YEAR_GROUPS } from '../../schedule/constants';
+
+const TEACHING_LEVEL_OPTIONS = ['College', 'Masteral', 'Elementary', 'Junior High School', 'Senior High School'];
+const BASIC_ED_LEVELS = ['Elementary', 'Junior High School', 'Senior High School'];
 
 const FIELD_DEFAULTS = {
   first_name: '',
@@ -22,6 +26,8 @@ const FIELD_DEFAULTS = {
 
 export default function FacultyEditModal({ faculty, onClose, onSaved, selfEdit = false, liveAvailability }) {
   const [form, setForm] = useState(FIELD_DEFAULTS);
+  const [teachingLevels, setTeachingLevels] = useState([]);
+  const [teachingGrades, setTeachingGrades] = useState([]);
   const [officeDays, setOfficeDays] = useState([]);
   const [officeStart, setOfficeStart] = useState('');
   const [officeEnd, setOfficeEnd] = useState('');
@@ -47,6 +53,8 @@ export default function FacultyEditModal({ faculty, onClose, onSaved, selfEdit =
       availability_status: faculty.availability_status || 'available',
       status_detail: faculty.status_detail || '',
     });
+    setTeachingLevels(faculty.teaching_levels || []);
+    setTeachingGrades(faculty.teaching_grades || []);
     const parsed = parseOfficeHours(faculty.office_hours);
     setOfficeDays(parsed.days);
     setOfficeStart(parsed.start);
@@ -61,6 +69,18 @@ export default function FacultyEditModal({ faculty, onClose, onSaved, selfEdit =
   const toggleDay = (day) =>
     setOfficeDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
 
+  const toggleTeachingLevel = (level) =>
+    setTeachingLevels((prev) => (prev.includes(level) ? prev.filter((l) => l !== level) : [...prev, level]));
+
+  const toggleTeachingGrade = (grade) =>
+    setTeachingGrades((prev) => (prev.includes(grade) ? prev.filter((g) => g !== grade) : [...prev, grade]));
+
+  // Only offer grades under whichever Basic Ed level(s) are currently checked above - a
+  // teacher tagged "Elementary" only ever needs to narrow down among Grade 1-6, not JHS/SHS.
+  const gradeOptions = BASIC_ED_LEVELS.filter((level) => teachingLevels.includes(level)).flatMap(
+    (level) => BASIC_ED_YEAR_GROUPS[level]
+  );
+
   const handleSubmit = (e) => {
     e.preventDefault();
     setError(null);
@@ -68,6 +88,8 @@ export default function FacultyEditModal({ faculty, onClose, onSaved, selfEdit =
 
     const payload = {
       ...form,
+      teaching_levels: teachingLevels,
+      teaching_grades: teachingGrades,
       office_hours: formatOfficeHours(officeDays, officeStart, officeEnd),
       specializations: form.specializations
         .split(',')
@@ -172,6 +194,54 @@ export default function FacultyEditModal({ faculty, onClose, onSaved, selfEdit =
           </div>
 
           <Field label="Specializations" value={form.specializations} onChange={update('specializations')} placeholder="Comma-separated, e.g. Algorithms, Machine Learning" />
+
+          {!selfEdit && (
+            <div>
+              <label className="text-[11px] font-semibold text-gray-400 uppercase">Teaching Levels</label>
+              <p className="text-xs text-gray-400 mb-1.5">Controls which timetables this teacher can be assigned to in Add Schedule.</p>
+              <div className="flex flex-wrap gap-1.5">
+                {TEACHING_LEVEL_OPTIONS.map((level) => (
+                  <button
+                    type="button"
+                    key={level}
+                    onClick={() => toggleTeachingLevel(level)}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                      teachingLevels.includes(level)
+                        ? 'bg-[#80172B] text-white border-[#80172B]'
+                        : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                    }`}
+                  >
+                    {level}
+                  </button>
+                ))}
+              </div>
+
+              {gradeOptions.length > 0 && (
+                <div className="mt-3">
+                  <label className="text-[11px] font-semibold text-gray-400 uppercase">Teaching Grades</label>
+                  <p className="text-xs text-gray-400 mb-1.5">
+                    Narrows it down further within Basic Ed - leave blank to allow every grade under the levels above.
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {gradeOptions.map((grade) => (
+                      <button
+                        type="button"
+                        key={grade}
+                        onClick={() => toggleTeachingGrade(grade)}
+                        className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${
+                          teachingGrades.includes(grade)
+                            ? 'bg-[#80172B] text-white border-[#80172B]'
+                            : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'
+                        }`}
+                      >
+                        {grade}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {selfEdit ? (
             liveAvailability && (

@@ -83,7 +83,7 @@ export default function FacultyProfileModal({ faculty, onClose, isAdmin = false,
               className="flex-1 flex items-center justify-center gap-1.5 bg-[#80172B] text-white text-sm font-medium py-2 rounded-lg hover:bg-[#651020] transition-colors"
             >
               <CalendarDays className="w-4 h-4" />
-              Schedule &amp; Bookings
+              Schedule &amp; Appointments
             </button>
           </div>
         )}

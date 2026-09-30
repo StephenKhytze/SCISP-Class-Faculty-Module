@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Schedule;
 
 use App\Http\Controllers\Controller;
+use App\Models\Room;
 use App\Models\Schedule;
-use App\Models\Subject;
 use Illuminate\Http\Request;
 
 class ScheduleController extends Controller
@@ -72,13 +72,15 @@ class ScheduleController extends Controller
 
     private function validateSchedule(Request $request): array
     {
+        // Subjects are no longer created on the fly from here - a subject must already
+        // exist (added through Manage Subjects, properly tagged to its course/year level)
+        // before it can be scheduled. This is what keeps the subject catalog scoped instead
+        // of accumulating untagged, system-wide entries every time a class is added.
         $data = $request->validate([
-            'subject_id' => 'nullable|exists:subjects,subject_id',
-            'new_subject_code' => 'required_without:subject_id|nullable|string',
-            'new_subject_name' => 'required_without:subject_id|nullable|string',
+            'subject_id' => 'required|exists:subjects,subject_id',
+            'room_id' => 'nullable|exists:rooms,room_id',
             'education_level' => 'required|in:College,Masteral,Basic Ed',
             'faculty_id' => 'required|exists:faculty,faculty_id',
-            'room' => 'nullable|string',
             'level' => 'nullable|string',
             'year' => 'nullable|string',
             'strand' => 'nullable|string',
@@ -88,15 +90,12 @@ class ScheduleController extends Controller
             'end_time' => 'required',
         ]);
 
-        if (empty($data['subject_id'])) {
-            $subject = Subject::firstOrCreate(
-                ['subject_code' => $data['new_subject_code']],
-                ['subject_name' => $data['new_subject_name'], 'category' => 'Major']
-            );
-            $data['subject_id'] = $subject->subject_id;
+        // The client only ever sends room_id now (picked from the Room combobox) - the
+        // server derives the display string, so no raw room text ever comes from the form.
+        if (array_key_exists('room_id', $data)) {
+            $room = $data['room_id'] ? Room::find($data['room_id']) : null;
+            $data['room'] = $room ? trim("{$room->room_code} • {$room->building}") : null;
         }
-
-        unset($data['new_subject_code'], $data['new_subject_name']);
 
         return $data;
     }

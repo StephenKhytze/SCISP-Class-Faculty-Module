@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Search, RotateCcw, Users, CalendarClock, UserPlus, ClipboardList } from 'lucide-react';
+import { Search, RotateCcw, Users, CalendarClock, UserPlus, ClipboardList, CalendarOff } from 'lucide-react';
 import api from '../../services/api';
 import FacultyCard from './components/FacultyCard';
 import FacultyProfileModal from './components/FacultyProfileModal';
@@ -9,6 +9,8 @@ import AdminBookingsPanel from './components/AdminBookingsPanel';
 import BookingRequestModal from './components/BookingRequestModal';
 import FacultyEditModal from './components/FacultyEditModal';
 import FacultyScheduleModal from './components/FacultyScheduleModal';
+import TeacherLeavePanel from './components/TeacherLeavePanel';
+import AdminLeavePanel from './components/AdminLeavePanel';
 import { STATUS_LABELS } from './constants';
 
 const EMPTY_FILTERS = {
@@ -76,6 +78,17 @@ export default function FacultyList() {
 
   useEffect(refreshPendingCounts, [isAdmin]);
 
+  const [pendingLeaveCount, setPendingLeaveCount] = useState(0);
+  const refreshPendingLeaveCount = () => {
+    if (!isAdmin) return;
+    api
+      .get('/leave-requests', { params: { status: 'pending' } })
+      .then((res) => setPendingLeaveCount(res.data.length))
+      .catch(() => setPendingLeaveCount(0));
+  };
+
+  useEffect(refreshPendingLeaveCount, [isAdmin]);
+
   const departments = useMemo(
     () => [...new Set(faculties.map((f) => f.department))].sort(),
     [faculties]
@@ -133,7 +146,7 @@ export default function FacultyList() {
         </div>
         <h2 className="text-2xl font-extrabold text-gray-900">Faculty Directory & Consultation Schedule</h2>
         <p className="text-sm text-gray-500 mt-1">
-          Search department professors, check real-time availability, view linked class schedules & request consultation booking slots.
+          Search department professors, check real-time availability, view linked class schedules & request consultation appointment slots.
         </p>
       </div>
 
@@ -162,7 +175,20 @@ export default function FacultyList() {
               }`}
             >
               <CalendarClock className="w-4 h-4" />
-              My Consultation Bookings
+              My Consultation Appointments
+            </button>
+          )}
+          {isFaculty && (
+            <button
+              onClick={() => setActiveTab('my-leave')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-t-lg text-sm font-semibold transition-colors shrink-0 whitespace-nowrap ${
+                activeTab === 'my-leave'
+                  ? 'bg-[#80172B] text-white'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <CalendarOff className="w-4 h-4" />
+              My Leave Requests
             </button>
           )}
           {canViewMyBookings && (
@@ -175,7 +201,7 @@ export default function FacultyList() {
               }`}
             >
               <CalendarClock className="w-4 h-4" />
-              My Bookings
+              My Consultation Appointments
             </button>
           )}
           {canManageAllBookings && (
@@ -188,10 +214,28 @@ export default function FacultyList() {
               }`}
             >
               <ClipboardList className="w-4 h-4" />
-              All Consultation Bookings
+              All Consultation Appointments
               {Object.values(pendingByFaculty).reduce((sum, n) => sum + n, 0) > 0 && (
                 <span className="bg-amber-100 text-amber-700 text-[11px] font-bold px-1.5 py-0.5 rounded-full">
                   {Object.values(pendingByFaculty).reduce((sum, n) => sum + n, 0)}
+                </span>
+              )}
+            </button>
+          )}
+          {isAdmin && (
+            <button
+              onClick={() => setActiveTab('leave-requests')}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-t-lg text-sm font-semibold transition-colors shrink-0 whitespace-nowrap ${
+                activeTab === 'leave-requests'
+                  ? 'bg-[#80172B] text-white'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <CalendarOff className="w-4 h-4" />
+              Leave Requests
+              {pendingLeaveCount > 0 && (
+                <span className="bg-amber-100 text-amber-700 text-[11px] font-bold px-1.5 py-0.5 rounded-full">
+                  {pendingLeaveCount}
                 </span>
               )}
             </button>
@@ -299,6 +343,10 @@ export default function FacultyList() {
         </>
       ) : activeTab === 'bookings' ? (
         canManageBookings && <TeacherBookingsDashboard />
+      ) : activeTab === 'my-leave' ? (
+        isFaculty && <TeacherLeavePanel />
+      ) : activeTab === 'leave-requests' ? (
+        isAdmin && <AdminLeavePanel onLeaveChanged={refreshPendingLeaveCount} />
       ) : activeTab === 'all-bookings' ? (
         canManageAllBookings && <AdminBookingsPanel onBookingChanged={refreshPendingCounts} />
       ) : (

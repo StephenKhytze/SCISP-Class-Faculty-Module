@@ -7,7 +7,7 @@ export default function BookingStatCards({ bookings }) {
   const completed = bookings.filter((b) => b.status === 'completed').length;
 
   const cards = [
-    { label: 'Total Bookings', value: total, icon: CalendarRange, tone: 'bg-white border-gray-200 text-gray-700' },
+    { label: 'Total Appointments', value: total, icon: CalendarRange, tone: 'bg-white border-gray-200 text-gray-700' },
     { label: 'Pending Review', value: pending, icon: Clock, tone: 'bg-amber-50 border-amber-200 text-amber-700' },
     { label: 'Approved Slots', value: approved, icon: CheckCircle2, tone: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
     { label: 'Completed Sessions', value: completed, icon: UserCheck, tone: 'bg-white border-gray-200 text-gray-700' },

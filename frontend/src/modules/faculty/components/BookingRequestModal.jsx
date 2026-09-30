@@ -72,7 +72,7 @@ export default function BookingRequestModal({ faculty, onClose }) {
         student_name: currentUser?.name,
       })
       .then(() => setSuccess(true))
-      .catch((err) => setError(err.response?.data?.message || 'Unable to submit your booking request.'))
+      .catch((err) => setError(err.response?.data?.message || 'Unable to submit your appointment request.'))
       .finally(() => setSubmitting(false));
   };
 

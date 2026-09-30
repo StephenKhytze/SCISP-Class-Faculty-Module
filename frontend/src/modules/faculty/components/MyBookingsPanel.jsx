@@ -14,11 +14,11 @@ export default function MyBookingsPanel() {
     api
       .get('/consultations/me')
       .then((res) => setBookings(res.data))
-      .catch(() => setError('Unable to load your consultation bookings.'))
+      .catch(() => setError('Unable to load your consultation appointments.'))
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <p className="text-sm text-gray-500">Loading your consultation bookings...</p>;
+  if (loading) return <p className="text-sm text-gray-500">Loading your consultation appointments...</p>;
   if (error) return <p className="text-sm text-rose-600">{error}</p>;
 
   return (

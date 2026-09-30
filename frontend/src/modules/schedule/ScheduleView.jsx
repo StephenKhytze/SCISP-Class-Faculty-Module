@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Search, FileDown, Lightbulb, ArrowRight, ArrowLeft, UserCheck, GraduationCap, School, Landmark, Plus, Bell, Archive, ArchiveRestore } from 'lucide-react';
+import { Search, FileDown, Lightbulb, ArrowRight, ArrowLeft, UserCheck, GraduationCap, School, Landmark, Plus, Bell, Archive, ArchiveRestore, BookOpen, Building2 } from 'lucide-react';
 import api from '../../services/api';
 import ScheduleCell from './components/ScheduleCell';
 import InstructorProfileModal from './components/InstructorProfileModal';
 import ClassDetailModal from './components/ClassDetailModal';
 import ScheduleEditModal from './components/ScheduleEditModal';
-import { DAYS, TIME_SLOTS, EDUCATION_LEVELS, BASIC_ED_YEAR_GROUPS, STRANDS, isSeniorHigh, currentDayName, currentTimeHHMM, compactHour } from './constants';
+import AddCourseModal from './components/AddCourseModal';
+import AddClassSectionModal from './components/AddClassSectionModal';
+import ManageSubjectsModal from './components/ManageSubjectsModal';
+import ManageRoomsModal from './components/ManageRoomsModal';
+import { SCHEDULE_DAYS, TIME_SLOTS, EDUCATION_LEVELS, BASIC_ED_YEAR_GROUPS, STRANDS, isSeniorHigh, slotsSpannedBy, currentDayName, currentTimeHHMM, compactHour } from './constants';
 
 const EDUCATION_LEVEL_ICONS = { College: Landmark, Masteral: GraduationCap, 'Basic Ed': School };
 const EDUCATION_LEVEL_DESCRIPTIONS = {
@@ -23,12 +27,16 @@ const EMPTY_FILTERS = {
   strand: '',
   section: '',
   facultyId: '',
-  dayRange: 'weekdays',
+  dayRange: 'all',
 };
 
 export default function ScheduleView() {
   const [schedules, setSchedules] = useState([]);
   const [faculties, setFaculties] = useState([]);
+  const [courses, setCourses] = useState([]);
+  const [classSections, setClassSections] = useState([]);
+  const [archivedClassSections, setArchivedClassSections] = useState([]);
+  const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedInstructor, setSelectedInstructor] = useState(null);
@@ -36,6 +44,12 @@ export default function ScheduleView() {
   const [editingSchedule, setEditingSchedule] = useState(null);
   const [showUpdateBanner, setShowUpdateBanner] = useState(false);
   const [viewingArchived, setViewingArchived] = useState(false);
+  const [addingCourse, setAddingCourse] = useState(false);
+  const [addingYearLevel, setAddingYearLevel] = useState(false);
+  const [addingSection, setAddingSection] = useState(false);
+  const [addingStrand, setAddingStrand] = useState(false);
+  const [managingSubjects, setManagingSubjects] = useState(false);
+  const [managingRooms, setManagingRooms] = useState(false);
 
   const currentUser = useMemo(() => {
     try {
@@ -64,7 +78,9 @@ export default function ScheduleView() {
   const [category, setCategory] = useState(null); // 'class' | 'teacher' | null
   const [educationCategory, setEducationCategory] = useState(null); // College | Masteral | Basic Ed
   const [basicEdLevel, setBasicEdLevel] = useState(null); // Elementary | Junior High School | Senior High School
-  const [pendingProgram, setPendingProgram] = useState(null); // College/Masteral course or program name
+  const [pendingCourseId, setPendingCourseId] = useState(null);
+  const [pendingProgram, setPendingProgram] = useState(null); // course code, matches schedules.level
+  const [pendingProgramName, setPendingProgramName] = useState(null); // course full name, for display
   const [pendingGrade, setPendingGrade] = useState(null); // Basic Ed grade, or College/Masteral year level
   const [pendingStrand, setPendingStrand] = useState(null); // Basic Ed SHS strand
 
@@ -80,6 +96,13 @@ export default function ScheduleView() {
   useEffect(() => {
     if (isStudent) return;
     api.get('/faculty').then((res) => setFaculties(res.data)).catch(() => setFaculties([]));
+    api.get('/courses').then((res) => setCourses(res.data)).catch(() => setCourses([]));
+    api.get('/class-sections').then((res) => setClassSections(res.data)).catch(() => setClassSections([]));
+    api
+      .get('/class-sections', { params: { archived: 1 } })
+      .then((res) => setArchivedClassSections(res.data))
+      .catch(() => setArchivedClassSections([]));
+    api.get('/rooms').then((res) => setRooms(res.data)).catch(() => setRooms([]));
   }, [isStudent]);
 
   useEffect(() => {
@@ -130,64 +153,111 @@ export default function ScheduleView() {
     }
   }, [isStudent, loading, schedules, filters.level, filters.year, currentUser]);
 
-  // Programs/courses available under the currently browsed education category.
+  // Courses/programs available under the currently browsed education category - sourced
+  // from the courses reference table (not derived from schedules), so a course with zero
+  // classes yet still shows up as a pickable option.
   const programs = useMemo(
-    () =>
-      [...new Set(schedules.filter((s) => s.education_level === educationCategory).map((s) => s.level))]
-        .filter(Boolean)
-        .sort(),
-    [schedules, educationCategory]
+    () => courses.filter((c) => c.education_level === educationCategory).sort((a, b) => a.code.localeCompare(b.code)),
+    [courses, educationCategory]
   );
   const yearsForPendingProgram = useMemo(
     () =>
-      [
-        ...new Set(
-          schedules
-            .filter((s) => s.education_level === educationCategory && s.level === pendingProgram)
-            .map((s) => s.year)
-        ),
-      ].filter(Boolean).sort(),
-    [schedules, educationCategory, pendingProgram]
+      [...new Set(classSections.filter((s) => s.course_id === pendingCourseId).map((s) => s.year_label))]
+        .filter(Boolean)
+        .sort(),
+    [classSections, pendingCourseId]
   );
 
+  // Strands for the SHS grade being browsed - the fixed 7-strand list always shows by
+  // default (as it always has), minus whichever ones an admin explicitly archived for this
+  // grade. Archiving/restoring a strand is tracked as a placeholder class_sections row
+  // (education_level/level_label/year_label/strand, no section_name) rather than a real
+  // section, so it never touches an actual class section sharing the same strand name.
+  const archivedStrandNames = useMemo(() => {
+    return new Set(
+      archivedClassSections
+        .filter(
+          (s) =>
+            s.education_level === 'Basic Ed' && s.level_label === basicEdLevel && s.year_label === pendingGrade && s.strand && !s.section_name
+        )
+        .map((s) => s.strand)
+    );
+  }, [archivedClassSections, basicEdLevel, pendingGrade]);
+
+  const visibleStrands = useMemo(() => STRANDS.filter((s) => !archivedStrandNames.has(s)), [archivedStrandNames]);
+
   // Sections available for whatever scope has been narrowed down so far - always offers
-  // an "All Sections" fallback so records saved without a section stay reachable.
+  // an "All Sections" fallback so records saved without a section stay reachable. Kept as
+  // the actual row (not just the name) so each can be archived individually.
   const sectionsInScope = useMemo(() => {
-    const matches = schedules.filter((s) => {
+    const matches = classSections.filter((s) => {
+      if (!s.section_name) return false;
       if (s.education_level !== educationCategory) return false;
       if (educationCategory === 'Basic Ed') {
-        if (s.level !== basicEdLevel || s.year !== pendingGrade) return false;
+        if (s.level_label !== basicEdLevel || s.year_label !== pendingGrade) return false;
         if (isSeniorHigh(pendingGrade) && s.strand !== pendingStrand) return false;
         return true;
       }
-      return s.level === pendingProgram && s.year === pendingGrade;
+      return s.course_id === pendingCourseId && s.year_label === pendingGrade;
     });
-    return [...new Set(matches.map((s) => s.section))].filter(Boolean).sort();
-  }, [schedules, educationCategory, basicEdLevel, pendingGrade, pendingStrand, pendingProgram]);
-
-  const subjects = useMemo(() => {
-    const map = new Map();
-    schedules.forEach((s) => {
-      if (s.subject_id && !map.has(s.subject_id)) {
-        map.set(s.subject_id, { subject_id: s.subject_id, subject_code: s.subject_code, subject_name: s.subject_name });
-      }
+    const byName = new Map();
+    matches.forEach((s) => {
+      if (!byName.has(s.section_name)) byName.set(s.section_name, s);
     });
-    return [...map.values()].sort((a, b) => a.subject_code.localeCompare(b.subject_code));
-  }, [schedules]);
+    return [...byName.values()].sort((a, b) => a.section_name.localeCompare(b.section_name));
+  }, [classSections, educationCategory, basicEdLevel, pendingGrade, pendingStrand, pendingCourseId]);
 
+  // Three distinct conflict scopes, checked separately:
+  //  - Faculty overlap: same teacher, two classes at once - an admin/faculty problem.
+  //  - Room overlap: same room, two classes at once - also an admin/faculty problem, but
+  //    not necessarily the same pair of classes as the faculty overlap above.
+  //  - Student personal overlap: the student's OWN section double-booked with two
+  //    different subjects at once - the only kind of conflict a student can actually see
+  //    the full picture of (and the only kind that's actually theirs to worry about).
+  // A student never sees a faculty/room conflict on their own class card: from their
+  // filtered view the other half of that clash usually belongs to a different section they
+  // can't see anyway, which just looks like an unexplained warning rather than something
+  // they could act on. Admin/Faculty keep seeing both, since they can act on either.
   const schedulesWithConflicts = useMemo(() => {
     return schedules.map((entry) => {
-      const conflicts = schedules.filter(
+      const overlapsWith = (other) =>
+        other.schedule_id !== entry.schedule_id &&
+        other.day === entry.day &&
+        entry.start_time < other.end_time &&
+        entry.end_time > other.start_time;
+
+      const facultyConflicts = schedules.filter((other) => overlapsWith(other) && other.faculty_id === entry.faculty_id);
+      const roomConflicts = schedules.filter(
         (other) =>
-          other.schedule_id !== entry.schedule_id &&
-          other.room === entry.room &&
-          other.day === entry.day &&
-          entry.start_time < other.end_time &&
-          entry.end_time > other.start_time
+          overlapsWith(other) &&
+          entry.room?.trim() &&
+          other.room?.trim().toLowerCase() === entry.room.trim().toLowerCase()
       );
-      return { ...entry, hasConflict: conflicts.length > 0, conflicts };
+      const studentConflicts = schedules.filter(
+        (other) =>
+          overlapsWith(other) &&
+          other.subject_id !== entry.subject_id &&
+          other.education_level === entry.education_level &&
+          other.level === entry.level &&
+          other.year === entry.year &&
+          other.strand === entry.strand &&
+          other.section === entry.section
+      );
+
+      const relevantConflicts = isStudent ? studentConflicts : [...facultyConflicts, ...roomConflicts];
+      const conflicts = [...new Map(relevantConflicts.map((c) => [c.schedule_id, c])).values()];
+
+      const reasonParts = [];
+      if (isStudent) {
+        if (studentConflicts.length > 0) reasonParts.push('your section is double-booked');
+      } else {
+        if (facultyConflicts.length > 0) reasonParts.push('same instructor');
+        if (roomConflicts.length > 0) reasonParts.push('same room');
+      }
+
+      return { ...entry, hasConflict: conflicts.length > 0, conflicts, conflictReason: reasonParts.join(' & ') };
     });
-  }, [schedules]);
+  }, [schedules, isStudent]);
 
   const filteredSchedules = useMemo(() => {
     const keyword = filters.search.trim().toLowerCase();
@@ -206,19 +276,67 @@ export default function ScheduleView() {
     });
   }, [schedulesWithConflicts, filters]);
 
-  const visibleDays = filters.dayRange === 'weekdays' ? DAYS.slice(0, 5) : DAYS;
+  // Basic Ed never runs Sunday classes - College/Masteral (weekend/evening programs) can.
+  // "Filter Day" narrows down to one specific day instead of an all-or-nothing range.
+  const daysForContext = useMemo(
+    () => (filters.educationLevel === 'Basic Ed' ? SCHEDULE_DAYS.filter((d) => d !== 'Sunday') : SCHEDULE_DAYS),
+    [filters.educationLevel]
+  );
+  const visibleDays = useMemo(
+    () => (daysForContext.includes(filters.dayRange) ? [filters.dayRange] : daysForContext),
+    [daysForContext, filters.dayRange]
+  );
 
+  // Renders each day's column as merged rowSpan blocks instead of repeating a class in
+  // every 1-hour slot it touches: a slot already covered by an earlier row's rowSpan
+  // gets `render: false` and is skipped entirely (no <td> emitted for it at all).
+  const dayPlans = useMemo(() => {
+    const plans = {};
+    visibleDays.forEach((day) => {
+      const entriesForDay = filteredSchedules.filter((s) => s.day === day);
+      const plan = new Array(TIME_SLOTS.length).fill(null);
+      for (let i = 0; i < TIME_SLOTS.length; i++) {
+        if (plan[i]) continue;
+        const slot = TIME_SLOTS[i];
+        const overlapping = entriesForDay.filter((e) => e.start_time < slot.end && e.end_time > slot.start);
+        if (overlapping.length === 0) {
+          plan[i] = { render: true, rowSpan: 1, entries: [] };
+          continue;
+        }
+        const span = Math.min(Math.max(...overlapping.map(slotsSpannedBy)), TIME_SLOTS.length - i);
+        plan[i] = { render: true, rowSpan: span, entries: overlapping };
+        for (let j = 1; j < span; j++) plan[i + j] = { render: false };
+      }
+      plans[day] = plan;
+    });
+    return plans;
+  }, [visibleDays, filteredSchedules]);
+
+  // "Current class" is a personal indicator ("you currently have X") - scope it to the
+  // logged-in student's own level/year or the logged-in teacher's own classes. Admin has
+  // no personal schedule, so it never shows for that role.
   const currentClass = useMemo(() => {
     const day = currentDayName();
     const time = currentTimeHHMM();
     if (!day) return null;
-    return schedules.find((s) => s.day === day && s.start_time <= time && s.end_time > time) || null;
-  }, [schedules]);
-
-  const entriesFor = (day, slot) =>
-    filteredSchedules.filter(
-      (s) => s.day === day && s.start_time < slot.end && s.end_time > slot.start
-    );
+    if (isStudent) {
+      if (!filters.level || !filters.year) return null;
+      return (
+        schedules.find(
+          (s) => s.day === day && s.start_time <= time && s.end_time > time && s.level === filters.level && s.year === filters.year
+        ) || null
+      );
+    }
+    if (isFaculty) {
+      if (!filters.facultyId) return null;
+      return (
+        schedules.find(
+          (s) => s.day === day && s.start_time <= time && s.end_time > time && String(s.faculty_id) === String(filters.facultyId)
+        ) || null
+      );
+    }
+    return null;
+  }, [schedules, isStudent, isFaculty, filters.level, filters.year, filters.facultyId]);
 
   const handleScheduleSaved = (saved) =>
     setSchedules((prev) =>
@@ -243,6 +361,39 @@ export default function ScheduleView() {
       .catch(() => setError('Unable to restore that class.'));
   };
 
+  const handleArchiveSection = (section, e) => {
+    e.stopPropagation();
+    if (!window.confirm(`Archive Section ${section.section_name}? It will be hidden from this picker, but not deleted.`)) return;
+    api
+      .patch(`/class-sections/${section.class_section_id}/archive`)
+      .then(() => setClassSections((prev) => prev.filter((s) => s.class_section_id !== section.class_section_id)))
+      .catch(() => setError('Unable to archive that section.'));
+  };
+
+  const handleArchiveStrand = (strandName, e) => {
+    e.stopPropagation();
+    if (!window.confirm(`Archive the ${strandName} strand for ${pendingGrade}? It will be hidden from this picker, but not deleted.`)) return;
+    // The strand may not have a class_sections row yet at all (it's shown by default from
+    // the fixed list) - register a placeholder for it first if needed, then archive that.
+    const placeholder = classSections.find(
+      (s) =>
+        s.education_level === 'Basic Ed' && s.level_label === basicEdLevel && s.year_label === pendingGrade && s.strand === strandName && !s.section_name
+    );
+    const ensureRow = placeholder
+      ? Promise.resolve(placeholder)
+      : api
+          .post('/class-sections', { education_level: 'Basic Ed', level_label: basicEdLevel, year_label: pendingGrade, strand: strandName })
+          .then((res) => res.data);
+
+    ensureRow
+      .then((row) => api.patch(`/class-sections/${row.class_section_id}/archive`))
+      .then((res) => {
+        setClassSections((prev) => prev.filter((s) => s.class_section_id !== res.data.class_section_id));
+        setArchivedClassSections((prev) => [...prev.filter((s) => s.class_section_id !== res.data.class_section_id), res.data]);
+      })
+      .catch(() => setError('Unable to archive that strand.'));
+  };
+
   const openArchivedView = () => {
     setFilters(EMPTY_FILTERS);
     setCategory(null);
@@ -260,7 +411,9 @@ export default function ScheduleView() {
     setCategory('class');
     setEducationCategory(level);
     setBasicEdLevel(null);
+    setPendingCourseId(null);
     setPendingProgram(null);
+    setPendingProgramName(null);
     setPendingGrade(null);
     setPendingStrand(null);
     setScreen(level === 'Basic Ed' ? 'pick-basic-ed-level' : 'pick-course');
@@ -287,7 +440,9 @@ export default function ScheduleView() {
   };
 
   const pickCourseStep = (course) => {
-    setPendingProgram(course);
+    setPendingCourseId(course.course_id);
+    setPendingProgram(course.code);
+    setPendingProgramName(course.name);
     setPendingGrade(null);
     setScreen('pick-year');
   };
@@ -328,7 +483,9 @@ export default function ScheduleView() {
     setCategory(null);
     setEducationCategory(null);
     setBasicEdLevel(null);
+    setPendingCourseId(null);
     setPendingProgram(null);
+    setPendingProgramName(null);
     setPendingGrade(null);
     setPendingStrand(null);
     setFilters(EMPTY_FILTERS);
@@ -347,7 +504,9 @@ export default function ScheduleView() {
   };
   const backToCoursePick = () => {
     setScreen('pick-course');
+    setPendingCourseId(null);
     setPendingProgram(null);
+    setPendingProgramName(null);
     setPendingGrade(null);
     setFilters(EMPTY_FILTERS);
   };
@@ -403,6 +562,13 @@ export default function ScheduleView() {
         }
       : null;
 
+  // What Manage Subjects and the Add Schedule form's filtered dropdowns key off of.
+  const subjectScopeContext = {
+    course_id: pendingCourseId || null,
+    year_label: filters.year || null,
+    strand: filters.strand || null,
+  };
+
   const printedOn = new Date().toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   return (
@@ -457,11 +623,29 @@ export default function ScheduleView() {
         <div className="print:hidden flex flex-wrap items-center gap-2">
           {showAddSchedule && (
             <button
+              onClick={() => setManagingSubjects(true)}
+              className="flex items-center gap-2 border border-gray-300 text-gray-700 text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <BookOpen className="w-4 h-4" />
+              Manage Subjects
+            </button>
+          )}
+          {showAddSchedule && (
+            <button
               onClick={() => setEditingSchedule({})}
               className="flex items-center gap-2 bg-[#80172B] text-white text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-[#651020] transition-colors"
             >
               <Plus className="w-4 h-4" />
               Add Schedule
+            </button>
+          )}
+          {showAddSchedule && (
+            <button
+              onClick={() => setManagingRooms(true)}
+              className="flex items-center gap-2 border border-gray-300 text-gray-700 text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <Building2 className="w-4 h-4" />
+              Manage Rooms
             </button>
           )}
           {isAdmin && (
@@ -619,16 +803,41 @@ export default function ScheduleView() {
             <ArrowLeft className="w-3.5 h-3.5" />
             Back to Grades
           </button>
-          <h3 className="text-sm font-bold text-gray-900 mb-3">Select a Strand for {pendingGrade}</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-            {STRANDS.map((s) => (
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h3 className="text-sm font-bold text-gray-900">Select a Strand for {pendingGrade}</h3>
+            {isAdmin && (
               <button
-                key={s}
-                onClick={() => pickStrandStep(s)}
-                className="text-left px-3 py-2.5 border border-gray-200 rounded-lg hover:border-[#80172B] hover:bg-[#80172B]/5 transition-colors"
+                onClick={() => setAddingStrand(true)}
+                className="flex items-center gap-1.5 text-xs font-semibold text-[#80172B] hover:underline shrink-0"
               >
-                <p className="text-sm font-semibold text-gray-900">{s}</p>
+                <Plus className="w-3.5 h-3.5" />
+                Add Strand
               </button>
+            )}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+            {visibleStrands.map((s) => (
+              <div
+                key={s}
+                className="relative flex items-center border border-gray-200 rounded-lg hover:border-[#80172B] hover:bg-[#80172B]/5 transition-colors"
+              >
+                <button
+                  onClick={() => pickStrandStep(s)}
+                  className="flex-1 text-left px-3 py-2.5"
+                >
+                  <p className="text-sm font-semibold text-gray-900">{s}</p>
+                </button>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={(e) => handleArchiveStrand(s, e)}
+                    title="Archive this strand"
+                    className="text-gray-300 hover:text-amber-600 transition-colors pr-3 shrink-0"
+                  >
+                    <Archive className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         </div>
@@ -640,18 +849,29 @@ export default function ScheduleView() {
             <ArrowLeft className="w-3.5 h-3.5" />
             Back to Browse Options
           </button>
-          <h3 className="text-sm font-bold text-gray-900 mb-3">Select a {programLabel} under {educationCategory}</h3>
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h3 className="text-sm font-bold text-gray-900">Select a {programLabel} under {educationCategory}</h3>
+            {isAdmin && (
+              <button
+                onClick={() => setAddingCourse(true)}
+                className="flex items-center gap-1.5 text-xs font-semibold text-[#80172B] hover:underline shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Add {programLabel}
+              </button>
+            )}
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
             {programs.length === 0 ? (
-              <p className="text-sm text-gray-500 col-span-full">No {educationCategory} {programLabel.toLowerCase()}s found in the schedule yet.</p>
+              <p className="text-sm text-gray-500 col-span-full">No {educationCategory} {programLabel.toLowerCase()}s added yet.</p>
             ) : (
-              programs.map((lvl) => (
+              programs.map((course) => (
                 <button
-                  key={lvl}
-                  onClick={() => pickCourseStep(lvl)}
+                  key={course.course_id}
+                  onClick={() => pickCourseStep(course)}
                   className="text-left px-3 py-2.5 border border-gray-200 rounded-lg hover:border-[#80172B] hover:bg-[#80172B]/5 transition-colors"
                 >
-                  <p className="text-sm font-semibold text-gray-900">{lvl}</p>
+                  <p className="text-sm font-semibold text-gray-900">{course.name}</p>
                 </button>
               ))
             )}
@@ -665,10 +885,21 @@ export default function ScheduleView() {
             <ArrowLeft className="w-3.5 h-3.5" />
             Back to {programLabel}s
           </button>
-          <h3 className="text-sm font-bold text-gray-900 mb-3">Select a Year Level for {pendingProgram}</h3>
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h3 className="text-sm font-bold text-gray-900">Select a Year Level for {pendingProgramName}</h3>
+            {isAdmin && (
+              <button
+                onClick={() => setAddingYearLevel(true)}
+                className="flex items-center gap-1.5 text-xs font-semibold text-[#80172B] hover:underline shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Add Year Level
+              </button>
+            )}
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
             {yearsForPendingProgram.length === 0 ? (
-              <p className="text-sm text-gray-500 col-span-full">No year levels found for {pendingProgram} yet.</p>
+              <p className="text-sm text-gray-500 col-span-full">No year levels added for {pendingProgramName} yet.</p>
             ) : (
               yearsForPendingProgram.map((yr) => (
                 <button
@@ -690,16 +921,41 @@ export default function ScheduleView() {
             <ArrowLeft className="w-3.5 h-3.5" />
             Back to {educationCategory === 'Basic Ed' ? (isSeniorHigh(pendingGrade) ? 'Strands' : 'Grades') : 'Year Levels'}
           </button>
-          <h3 className="text-sm font-bold text-gray-900 mb-3">Select a Section</h3>
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <h3 className="text-sm font-bold text-gray-900">Select a Section</h3>
+            {isAdmin && (
+              <button
+                onClick={() => setAddingSection(true)}
+                className="flex items-center gap-1.5 text-xs font-semibold text-[#80172B] hover:underline shrink-0"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Add Section
+              </button>
+            )}
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
             {sectionsInScope.map((section) => (
-              <button
-                key={section}
-                onClick={() => pickSectionStep(section)}
-                className="text-left px-3 py-2.5 border border-gray-200 rounded-lg hover:border-[#80172B] hover:bg-[#80172B]/5 transition-colors"
+              <div
+                key={section.class_section_id}
+                className="relative flex items-center border border-gray-200 rounded-lg hover:border-[#80172B] hover:bg-[#80172B]/5 transition-colors"
               >
-                <p className="text-sm font-semibold text-gray-900">Section {section}</p>
-              </button>
+                <button
+                  onClick={() => pickSectionStep(section.section_name)}
+                  className="flex-1 text-left px-3 py-2.5"
+                >
+                  <p className="text-sm font-semibold text-gray-900">Section {section.section_name}</p>
+                </button>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={(e) => handleArchiveSection(section, e)}
+                    title="Archive this section"
+                    className="text-gray-300 hover:text-amber-600 transition-colors pr-3 shrink-0"
+                  >
+                    <Archive className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
             ))}
             <button
               onClick={() => pickSectionStep('')}
@@ -799,8 +1055,10 @@ export default function ScheduleView() {
                     onChange={(e) => setFilters((f) => ({ ...f, dayRange: e.target.value }))}
                     className="w-full mt-1 px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[#80172B]/30"
                   >
-                    <option value="weekdays">Monday - Friday</option>
-                    <option value="all">Monday - Saturday</option>
+                    <option value="all">All Days</option>
+                    {daysForContext.map((d) => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
                   </select>
                 </div>
               )}
@@ -820,7 +1078,7 @@ export default function ScheduleView() {
                   <p className="text-sm text-gray-500 text-center py-10">No archived classes found.</p>
                 ) : (
                   [...filteredSchedules]
-                    .sort((a, b) => DAYS.indexOf(a.day) - DAYS.indexOf(b.day) || a.start_time.localeCompare(b.start_time))
+                    .sort((a, b) => SCHEDULE_DAYS.indexOf(a.day) - SCHEDULE_DAYS.indexOf(b.day) || a.start_time.localeCompare(b.start_time))
                     .map((entry) => (
                       <div key={entry.schedule_id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-3 hover:bg-gray-50 transition-colors">
                         <div className="min-w-0">
@@ -862,23 +1120,31 @@ export default function ScheduleView() {
                     </tr>
                   </thead>
                   <tbody>
-                    {TIME_SLOTS.map((slot) => (
+                    {TIME_SLOTS.map((slot, slotIdx) => (
                       <tr key={slot.label} className="border-b border-gray-100 last:border-b-0">
                         <td className="p-0.5 sm:p-3 text-[8px] sm:text-xs font-bold text-gray-700 align-top w-8 sm:w-28 print:w-auto">
                           <span className="sm:hidden">{compactHour(slot.start)}-{compactHour(slot.end)}</span>
                           <span className="hidden sm:inline">{slot.label}</span>
                         </td>
-                        {visibleDays.map((day) => (
-                          <td key={day} className="p-0.5 sm:p-2 align-top border-l border-gray-100 sm:w-[160px] print:w-auto">
-                            <ScheduleCell
-                              entries={entriesFor(day, slot)}
-                              onSelectEntry={setSelectedClassEntry}
-                              isAdmin={isAdmin}
-                              onEdit={setEditingSchedule}
-                              onArchive={handleArchive}
-                            />
-                          </td>
-                        ))}
+                        {visibleDays.map((day) => {
+                          const cell = dayPlans[day]?.[slotIdx];
+                          if (!cell?.render) return null;
+                          return (
+                            <td
+                              key={day}
+                              rowSpan={cell.rowSpan}
+                              className="p-0.5 sm:p-2 align-top border-l border-gray-100 sm:w-[160px] print:w-auto"
+                            >
+                              <ScheduleCell
+                                entries={cell.entries}
+                                onSelectEntry={setSelectedClassEntry}
+                                isAdmin={isAdmin}
+                                onEdit={setEditingSchedule}
+                                onArchive={handleArchive}
+                              />
+                            </td>
+                          );
+                        })}
                       </tr>
                     ))}
                   </tbody>
@@ -901,11 +1167,67 @@ export default function ScheduleView() {
       <InstructorProfileModal faculty={selectedInstructor} onClose={() => setSelectedInstructor(null)} />
       <ScheduleEditModal
         schedule={editingSchedule}
-        subjects={subjects}
         allSchedules={schedules}
+        faculties={faculties}
+        rooms={rooms}
+        subjectScopeContext={subjectScopeContext}
         context={scheduleModalContext}
         onClose={() => setEditingSchedule(null)}
         onSaved={handleScheduleSaved}
+        onOpenManageSubjects={() => {
+          setEditingSchedule(null);
+          setManagingSubjects(true);
+        }}
+        onOpenManageRooms={() => {
+          setEditingSchedule(null);
+          setManagingRooms(true);
+        }}
+      />
+      <AddCourseModal
+        open={addingCourse}
+        educationLevel={educationCategory}
+        onClose={() => setAddingCourse(false)}
+        onSaved={(course) => setCourses((prev) => [...prev, course])}
+      />
+      <AddClassSectionModal
+        open={addingYearLevel}
+        mode="year"
+        context={{ education_level: educationCategory, course_id: pendingCourseId }}
+        onClose={() => setAddingYearLevel(false)}
+        onSaved={(section) => setClassSections((prev) => [...prev, section])}
+      />
+      <AddClassSectionModal
+        open={addingStrand}
+        mode="strand"
+        context={{ education_level: 'Basic Ed', level_label: basicEdLevel, year_label: pendingGrade }}
+        strandOptions={[...archivedStrandNames]}
+        onClose={() => setAddingStrand(false)}
+        onSaved={(section) => {
+          setClassSections((prev) => [...prev, section]);
+          setArchivedClassSections((prev) => prev.filter((s) => s.class_section_id !== section.class_section_id));
+        }}
+      />
+      <AddClassSectionModal
+        open={addingSection}
+        mode="section"
+        context={
+          educationCategory === 'Basic Ed'
+            ? { education_level: 'Basic Ed', level_label: basicEdLevel, year_label: pendingGrade, strand: pendingStrand || null }
+            : { education_level: educationCategory, course_id: pendingCourseId, year_label: pendingGrade }
+        }
+        onClose={() => setAddingSection(false)}
+        onSaved={(section) => setClassSections((prev) => [...prev, section])}
+      />
+      <ManageSubjectsModal
+        open={managingSubjects}
+        context={subjectScopeContext}
+        contextLabel={scopeLabel}
+        onClose={() => setManagingSubjects(false)}
+      />
+      <ManageRoomsModal
+        open={managingRooms}
+        onClose={() => setManagingRooms(false)}
+        onChanged={() => api.get('/rooms').then((res) => setRooms(res.data)).catch(() => {})}
       />
     </div>
   );

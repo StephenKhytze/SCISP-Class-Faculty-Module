@@ -15,6 +15,7 @@ class Schedule extends Model
         'education_level',
         'faculty_id',
         'room',
+        'room_id',
         'level',
         'year',
         'strand',
@@ -49,5 +50,10 @@ class Schedule extends Model
     public function faculty()
     {
         return $this->belongsTo(Faculty::class, 'faculty_id', 'faculty_id');
+    }
+
+    public function roomRecord()
+    {
+        return $this->belongsTo(Room::class, 'room_id', 'room_id');
     }
 }

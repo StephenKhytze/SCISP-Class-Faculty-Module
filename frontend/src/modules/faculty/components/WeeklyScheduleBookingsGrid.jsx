@@ -50,7 +50,7 @@ export default function WeeklyScheduleBookingsGrid({
     return (
       <div className="text-center py-8">
         <CalendarDays className="w-10 h-10 text-gray-300 mx-auto mb-3" />
-        <p className="text-sm text-gray-500">No classes or consultation bookings yet.</p>
+        <p className="text-sm text-gray-500">No classes or consultation appointments yet.</p>
       </div>
     );
   }
@@ -71,13 +71,13 @@ export default function WeeklyScheduleBookingsGrid({
         {statusesPresent.has('pending') && (
           <span className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-sm bg-amber-100 border border-amber-300" />
-            Pending booking
+            Pending appointment
           </span>
         )}
         {statusesPresent.has('approved') && (
           <span className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-sm bg-emerald-100 border border-emerald-300" />
-            Approved booking
+            Approved appointment
           </span>
         )}
       </div>

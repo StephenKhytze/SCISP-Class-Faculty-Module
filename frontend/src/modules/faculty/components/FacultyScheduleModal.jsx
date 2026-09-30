@@ -24,7 +24,7 @@ export default function FacultyScheduleModal({ faculty, onClose }) {
         setSchedule(scheduleData);
         setBookings(bookingData);
       })
-      .catch(() => setError('Unable to load this faculty member’s schedule and bookings.'))
+      .catch(() => setError('Unable to load this faculty member’s schedule and appointments.'))
       .finally(() => setLoading(false));
   }, [faculty]);
 
@@ -40,7 +40,7 @@ export default function FacultyScheduleModal({ faculty, onClose }) {
     api
       .patch(`/consultations/${consultationId}`, { status })
       .then((res) => setBookings((prev) => prev.map((b) => (b.consultation_id === consultationId ? res.data : b))))
-      .catch(() => setError('Unable to update that booking.'));
+      .catch(() => setError('Unable to update that appointment.'));
   };
 
   return (
@@ -53,7 +53,7 @@ export default function FacultyScheduleModal({ faculty, onClose }) {
           <X className="w-5 h-5" />
         </button>
 
-        <h2 className="text-lg font-bold text-gray-900 mb-1">Schedule &amp; Consultation Bookings</h2>
+        <h2 className="text-lg font-bold text-gray-900 mb-1">Schedule &amp; Consultation Appointments</h2>
         <p className="text-sm text-gray-500 mb-4">
           {faculty.name} &middot; {faculty.position}
         </p>
