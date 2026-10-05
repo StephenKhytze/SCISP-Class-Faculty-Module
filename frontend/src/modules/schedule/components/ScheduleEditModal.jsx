@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { X, Save, AlertTriangle } from 'lucide-react';
 import api from '../../../services/api';
-import { DAYS, SCHEDULE_DAYS } from '../constants';
+import { DAYS, SCHEDULE_DAYS, displayEducationLevel } from '../constants';
 import { to12Hour } from '../../faculty/officeHours';
 import RoomCombobox from './RoomCombobox';
 
@@ -150,7 +150,7 @@ export default function ScheduleEditModal({
   const subjectOptions = scopedSubjects.length > 0 ? scopedSubjects : contextSubjects;
 
   const contextLabel = [
-    effectiveContext.education_level,
+    displayEducationLevel(effectiveContext.education_level),
     effectiveContext.level,
     effectiveContext.year,
     effectiveContext.strand,

@@ -54,6 +54,65 @@ class ClassSectionController extends Controller
         // "ignore this column") - otherwise a placeholder registration such as "Add Strand"
         // (which never sends section_name) could match, and then archive, an unrelated real
         // section that happens to share the same education_level/level/year/strand.
+        // Strands are an open list - no fixed count, no "archive one first" rule. The only
+        // guard is against duplicates: the same name (case/extra-spaces insensitive) already
+        // active in this grade is rejected, and one that exists archived is pointed back to
+        // the restore flow instead of being recreated as a second row.
+        // Section names and year levels get the same normalized duplicate guard as strands:
+        // "Section A", "section a", and " Section A " are one record, not three.
+        if (! empty($data['section_name'])) {
+            $data['section_name'] = trim(preg_replace('/\s+/', ' ', $data['section_name']));
+            $sameScope = ClassSection::where('education_level', $data['education_level'])
+                ->where('course_id', $data['course_id'] ?? null)
+                ->where('level_label', $data['level_label'] ?? null)
+                ->where('year_label', $data['year_label'])
+                ->where('strand', $data['strand'] ?? null)
+                ->whereNotNull('section_name')
+                ->get();
+            $clash = $sameScope->first(fn ($s) => mb_strtolower(trim($s->section_name)) === mb_strtolower($data['section_name']));
+            if ($clash) {
+                $message = $clash->archived_at
+                    ? "{$clash->section_name} already exists but is archived. Restore it from Archived Sections."
+                    : "{$clash->section_name} already exists.";
+                return response()->json(['message' => $message, 'existing' => $clash], 422);
+            }
+        } elseif (! empty($data['year_label']) && empty($data['strand'])) {
+            $data['year_label'] = trim(preg_replace('/\s+/', ' ', $data['year_label']));
+            $sameYears = ClassSection::where('education_level', $data['education_level'])
+                ->where('course_id', $data['course_id'] ?? null)
+                ->where('level_label', $data['level_label'] ?? null)
+                ->whereNull('section_name')
+                ->whereNull('strand')
+                ->get();
+            $clash = $sameYears->first(fn ($s) => mb_strtolower(trim($s->year_label)) === mb_strtolower($data['year_label']));
+            if ($clash) {
+                $message = $clash->archived_at
+                    ? "{$clash->year_label} already exists but is archived. Restore it from Archived Year Levels."
+                    : "{$clash->year_label} already exists.";
+                return response()->json(['message' => $message, 'existing' => $clash], 422);
+            }
+        }
+
+        if (! empty($data['strand']) && empty($data['section_name'])) {
+            $data['strand'] = trim(preg_replace('/\s+/', ' ', $data['strand']));
+            $normalized = mb_strtolower($data['strand']);
+
+            $sameStrandRows = ClassSection::where('education_level', $data['education_level'])
+                ->where('level_label', $data['level_label'] ?? null)
+                ->where('year_label', $data['year_label'])
+                ->whereNull('section_name')
+                ->whereNotNull('strand')
+                ->get();
+            $clash = $sameStrandRows->first(fn ($s) => mb_strtolower(trim($s->strand)) === $normalized);
+
+            if ($clash) {
+                $message = $clash->archived_at
+                    ? "{$clash->strand} already exists but is archived. Restore it from Archived Strands."
+                    : "{$clash->strand} already exists.";
+                return response()->json(['message' => $message, 'existing' => $clash], 422);
+            }
+        }
+
         $matchData = array_merge([
             'course_id' => null,
             'level_label' => null,

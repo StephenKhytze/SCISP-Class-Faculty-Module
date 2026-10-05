@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MapPin, Mail, Clock, Tag, Copy, Check, UserRound, CalendarPlus, Pencil, Bell } from 'lucide-react';
+import { MapPin, Mail, Clock, Tag, Copy, Check, UserRound, CalendarPlus, Pencil, Bell, Archive, ArchiveRestore } from 'lucide-react';
 import { STATUS_STYLES, STATUS_DOT, statusLabel } from '../constants';
 
 export default function FacultyCard({
@@ -11,15 +11,20 @@ export default function FacultyCard({
   canBook = true,
   canEdit = false,
   pendingCount = 0,
+  archived = false,
+  onArchive,
+  onRestore,
 }) {
-  const [copied, setCopied] = useState(false);
+  const [copyStatus, setCopyStatus] = useState(null); // 'copied' | 'failed' | null
 
   const copyEmail = async () => {
     try {
       await navigator.clipboard.writeText(faculty.email_address);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {}
+      setCopyStatus('copied');
+    } catch {
+      setCopyStatus('failed');
+    }
+    setTimeout(() => setCopyStatus(null), 1800);
   };
 
   return (
@@ -73,11 +78,24 @@ export default function FacultyCard({
           <Mail className="w-4 h-4 text-gray-400 shrink-0" />
           <span className="truncate">{faculty.email_address}</span>
           <button
+            type="button"
             onClick={copyEmail}
-            className="text-gray-400 hover:text-[#80172B] transition-colors shrink-0"
+            className="flex items-center gap-1 text-gray-400 hover:text-[#80172B] transition-colors shrink-0"
             title="Copy email"
           >
-            {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+            {copyStatus === 'copied' ? (
+              <Check className="w-3.5 h-3.5 text-emerald-600" />
+            ) : (
+              <Copy className="w-3.5 h-3.5" />
+            )}
+            {copyStatus && (
+              <span
+                role="status"
+                className={`text-[11px] font-semibold ${copyStatus === 'copied' ? 'text-emerald-600' : 'text-rose-600'}`}
+              >
+                {copyStatus === 'copied' ? 'Email copied' : 'Copy failed'}
+              </span>
+            )}
           </button>
         </div>
         {faculty.office_hours && (
@@ -112,14 +130,35 @@ export default function FacultyCard({
           <UserRound className="w-4 h-4" />
           View Profile
         </button>
-        {canEdit ? (
+        {archived && canEdit ? (
           <button
-            onClick={() => onEdit(faculty)}
-            className="flex-1 flex items-center justify-center gap-1.5 bg-[#80172B] text-white text-sm font-medium py-2 rounded-lg hover:bg-[#651020] transition-colors"
+            type="button"
+            onClick={() => onRestore(faculty)}
+            className="flex-1 flex items-center justify-center gap-1.5 border border-[#80172B] text-[#80172B] text-sm font-medium py-2 rounded-lg hover:bg-[#80172B]/5 transition-colors"
           >
-            <Pencil className="w-4 h-4" />
-            Edit
+            <ArchiveRestore className="w-4 h-4" />
+            Restore
           </button>
+        ) : canEdit ? (
+          <>
+            <button
+              onClick={() => onEdit(faculty)}
+              className="flex-1 flex items-center justify-center gap-1.5 bg-[#80172B] text-white text-sm font-medium py-2 rounded-lg hover:bg-[#651020] transition-colors"
+            >
+              <Pencil className="w-4 h-4" />
+              Edit
+            </button>
+            {onArchive && (
+              <button
+                type="button"
+                onClick={() => onArchive(faculty)}
+                title="Archive teacher"
+                className="flex items-center justify-center border border-gray-300 text-gray-400 hover:text-amber-600 hover:border-amber-300 px-3 rounded-lg transition-colors"
+              >
+                <Archive className="w-4 h-4" />
+              </button>
+            )}
+          </>
         ) : (
           canBook && (
             <button

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Send, Inbox, MessageSquareText } from 'lucide-react';
 import api from '../../../services/api';
+import ConfirmDialog from '../../schedule/components/ConfirmDialog';
 import { LEAVE_STATUS_LABELS, LEAVE_STATUS_STYLES, formatLeaveRange, leaveDayCount } from '../constants';
 
 const EMPTY_FORM = { start_date: '', end_date: '', reason: '' };
@@ -9,6 +10,7 @@ export default function TeacherLeavePanel() {
   const [leaves, setLeaves] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [pendingCancel, setPendingCancel] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -39,8 +41,10 @@ export default function TeacherLeavePanel() {
       .finally(() => setSubmitting(false));
   };
 
-  const handleCancel = (leave) => {
-    if (!window.confirm('Cancel this leave request?')) return;
+  // Cancelling a leave asks first through the shared dialog; the request itself is unchanged.
+  const askCancel = (leave) => setPendingCancel(leave);
+
+  const cancelLeave = (leave) => {
     api
       .patch(`/leave-requests/${leave.leave_request_id}/cancel`)
       .then((res) => setLeaves((prev) => prev.map((l) => (l.leave_request_id === leave.leave_request_id ? res.data : l))))
@@ -52,6 +56,19 @@ export default function TeacherLeavePanel() {
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+      <ConfirmDialog
+        open={Boolean(pendingCancel)}
+        title="Cancel Leave Request?"
+        message="Your leave request will be cancelled. You can file a new one afterwards."
+        confirmLabel="Cancel Request"
+        tone="danger"
+        onConfirm={() => {
+          const leave = pendingCancel;
+          setPendingCancel(null);
+          cancelLeave(leave);
+        }}
+        onCancel={() => setPendingCancel(null)}
+      />
       <form onSubmit={handleSubmit} className="lg:col-span-2 bg-white border border-gray-200 rounded-xl p-5 space-y-4 h-fit">
         <div>
           <h3 className="text-base font-bold text-gray-900">File a Leave</h3>
@@ -150,7 +167,7 @@ export default function TeacherLeavePanel() {
               {leave.status === 'pending' && (
                 <div className="flex justify-end mt-3">
                   <button
-                    onClick={() => handleCancel(leave)}
+                    onClick={() => askCancel(leave)}
                     className="text-xs font-semibold text-gray-500 hover:text-rose-600 transition-colors"
                   >
                     Cancel Request

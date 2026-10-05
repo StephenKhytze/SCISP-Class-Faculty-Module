@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { X, Save, Pencil, BookOpen, AlertTriangle, Archive, ArchiveRestore } from 'lucide-react';
 import api from '../../../services/api';
+import ConfirmDialog from './ConfirmDialog';
 
 // A subject code is one catalog entry system-wide, not just within this course/year - "MATH1"
 // and "MATH 1" are the same code with a stray space, not two different subjects. Comparing
@@ -20,6 +21,7 @@ export default function ManageSubjectsModal({ open, context, contextLabel, onClo
   const [editing, setEditing] = useState(null); // subject being edited, or {} for new
   const [form, setForm] = useState({ subject_code: '', subject_name: '' });
   const [submitting, setSubmitting] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -96,8 +98,16 @@ export default function ManageSubjectsModal({ open, context, contextLabel, onClo
       .finally(() => setSubmitting(false));
   };
 
-  const handleArchive = (subject) => {
-    if (!window.confirm(`Archive ${subject.subject_code}? It will be hidden here and from Add Schedule, but not deleted.`)) return;
+    const askArchive = (subject) =>
+    setPendingAction({
+      title: `Archive Subject ${subject.subject_code}?`,
+      message: 'This subject will be moved to Archived Subjects. Existing schedule history will be preserved.',
+      confirmLabel: 'Archive',
+      tone: 'warning',
+      run: () => archiveSubject(subject),
+    });
+
+  const archiveSubject = (subject) => {
     api
       .patch(`/subjects/${subject.subject_id}/archive`)
       .then((res) => {
@@ -111,8 +121,15 @@ export default function ManageSubjectsModal({ open, context, contextLabel, onClo
       .catch(() => setError('Unable to archive that subject.'));
   };
 
-  const handleRestore = (subject) => {
-    if (!window.confirm(`Restore ${subject.subject_code}? It will reappear here and in Add Schedule.`)) return;
+  const askRestore = (subject) =>
+    setPendingAction({
+      title: `Restore Subject ${subject.subject_code}?`,
+      message: 'This subject will reappear in the active list and in Add Schedule.',
+      confirmLabel: 'Restore',
+      run: () => restoreSubject(subject),
+    });
+
+  const restoreSubject = (subject) => {
     api
       .patch(`/subjects/${subject.subject_id}/restore`)
       .then((res) => {
@@ -229,7 +246,7 @@ export default function ManageSubjectsModal({ open, context, contextLabel, onClo
                     <p className="text-xs text-gray-400 truncate">{s.subject_name}</p>
                   </div>
                   <button
-                    onClick={() => handleRestore(s)}
+                    onClick={() => askRestore(s)}
                     className="text-gray-400 hover:text-[#80172B] transition-colors shrink-0"
                     title="Restore subject"
                   >
@@ -263,7 +280,7 @@ export default function ManageSubjectsModal({ open, context, contextLabel, onClo
                     <Pencil className="w-4 h-4" />
                   </button>
                   <button
-                    onClick={() => handleArchive(s)}
+                    onClick={() => askArchive(s)}
                     className="text-gray-300 hover:text-amber-600 transition-colors p-1"
                     title="Archive subject"
                   >
@@ -275,6 +292,15 @@ export default function ManageSubjectsModal({ open, context, contextLabel, onClo
           </ul>
         )}
       </div>
+      <ConfirmDialog
+        open={Boolean(pendingAction)}
+        title={pendingAction?.title}
+        message={pendingAction?.message}
+        confirmLabel={pendingAction?.confirmLabel}
+        tone={pendingAction?.tone ?? 'default'}
+        onConfirm={() => { const a = pendingAction; setPendingAction(null); a.run(); }}
+        onCancel={() => setPendingAction(null)}
+      />
     </div>
   );
 }

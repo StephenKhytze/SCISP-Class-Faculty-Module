@@ -67,3 +67,9 @@ export function compactHour(hhmm) {
   const h = parseInt(hhmm.split(':')[0], 10);
   return String(h % 12 === 0 ? 12 : h % 12);
 }
+
+// User-facing name for an education level. The stored value stays 'Basic Ed' (backend and
+// enum logic depend on it); only what people read on screen says "Basic Education".
+export function displayEducationLevel(level) {
+  return level === 'Basic Ed' ? 'Basic Education' : level;
+}

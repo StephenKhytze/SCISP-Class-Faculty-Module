@@ -16,6 +16,14 @@ class FacultyController extends Controller
     {
         $query = Faculty::query();
 
+        // Archived teachers are hidden from every active list (directory, schedule instructor
+        // picker) unless explicitly requested; their schedules and history stay untouched.
+        if ($request->boolean('archived')) {
+            $query->whereNotNull('archived_at');
+        } else {
+            $query->whereNull('archived_at');
+        }
+
         if ($search = $request->query('search')) {
             $query->where(function ($q) use ($search) {
                 $q->where('first_name', 'like', "%{$search}%")
@@ -107,6 +115,20 @@ class FacultyController extends Controller
         ]);
 
         $faculty->update($data);
+
+        return response()->json($faculty);
+    }
+
+    public function archive(Faculty $faculty)
+    {
+        $faculty->update(['archived_at' => now()]);
+
+        return response()->json($faculty);
+    }
+
+    public function restore(Faculty $faculty)
+    {
+        $faculty->update(['archived_at' => null]);
 
         return response()->json($faculty);
     }

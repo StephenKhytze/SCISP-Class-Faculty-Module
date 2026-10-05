@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Search, RotateCcw, Users, CalendarClock, UserPlus, ClipboardList, CalendarOff } from 'lucide-react';
 import api from '../../services/api';
 import FacultyCard from './components/FacultyCard';
+import ConfirmDialog from '../schedule/components/ConfirmDialog';
 import FacultyProfileModal from './components/FacultyProfileModal';
 import TeacherBookingsDashboard from './components/TeacherBookingsDashboard';
 import MyBookingsPanel from './components/MyBookingsPanel';
@@ -41,6 +42,9 @@ export default function FacultyList() {
 
   const [activeTab, setActiveTab] = useState(isFaculty ? 'bookings' : 'directory');
   const [faculties, setFaculties] = useState([]);
+  const [archivedFaculties, setArchivedFaculties] = useState([]);
+  const [showArchivedTeachers, setShowArchivedTeachers] = useState(false);
+  const [pendingTeacherArchive, setPendingTeacherArchive] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filters, setFilters] = useState(EMPTY_FILTERS);
@@ -61,6 +65,34 @@ export default function FacultyList() {
       .catch(() => setError('Unable to load faculty directory.'))
       .finally(() => setLoading(false));
   }, [canViewDirectory]);
+
+  // Soft archive for teachers: the row and its schedules stay; it only leaves the active list.
+  useEffect(() => {
+    if (!canEditFaculty || !showArchivedTeachers) return;
+    api.get('/faculty', { params: { archived: 1 } }).then((res) => setArchivedFaculties(res.data)).catch(() => setArchivedFaculties([]));
+  }, [canEditFaculty, showArchivedTeachers]);
+
+  const confirmArchiveTeacher = () => {
+    const teacher = pendingTeacherArchive;
+    setPendingTeacherArchive(null);
+    api
+      .patch(`/faculty/${teacher.faculty_id}/archive`)
+      .then((res) => {
+        setFaculties((prev) => prev.filter((f) => f.faculty_id !== teacher.faculty_id));
+        setArchivedFaculties((prev) => [...prev.filter((f) => f.faculty_id !== teacher.faculty_id), res.data]);
+      })
+      .catch(() => setError('Unable to archive that teacher.'));
+  };
+
+  const restoreTeacher = (teacher) => {
+    api
+      .patch(`/faculty/${teacher.faculty_id}/restore`)
+      .then((res) => {
+        setArchivedFaculties((prev) => prev.filter((f) => f.faculty_id !== teacher.faculty_id));
+        setFaculties((prev) => [...prev.filter((f) => f.faculty_id !== teacher.faculty_id), res.data]);
+      })
+      .catch(() => setError('Unable to restore that teacher.'));
+  };
 
   const refreshPendingCounts = () => {
     if (!isAdmin) return;
@@ -317,10 +349,22 @@ export default function FacultyList() {
           {loading && <p className="text-sm text-gray-500">Loading faculty directory...</p>}
           {error && <p className="text-sm text-rose-600">{error}</p>}
 
-          {!loading && !error && (
+          {canEditFaculty && (
+            <div className="flex justify-end mb-4">
+              <button
+                type="button"
+                onClick={() => setShowArchivedTeachers((v) => !v)}
+                className="text-xs font-semibold text-[#80172B] hover:underline"
+              >
+                {showArchivedTeachers ? 'Back to Active Teachers' : 'View Archived Teachers'}
+              </button>
+            </div>
+          )}
+
+          {!loading && !error && !showArchivedTeachers && (
             <>
               {filteredFaculties.length === 0 ? (
-                <p className="text-sm text-gray-500">No faculty members match your filters.</p>
+                <p className="text-sm text-gray-500">{faculties.length === 0 ? 'No active teachers.' : 'No faculty members match your filters.'}</p>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
                   {filteredFaculties.map((faculty) => (
@@ -330,6 +374,7 @@ export default function FacultyList() {
                       onViewProfile={setSelectedFaculty}
                       onBook={handleBook}
                       onEdit={handleEdit}
+                      onArchive={setPendingTeacherArchive}
                       onManageBookings={handleViewSchedule}
                       canBook={canBookConsultation}
                       canEdit={canEditFaculty}
@@ -340,6 +385,35 @@ export default function FacultyList() {
               )}
             </>
           )}
+
+          {canEditFaculty && showArchivedTeachers && (
+            archivedFaculties.length === 0 ? (
+              <p className="text-sm text-gray-500">No archived teachers.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+                {archivedFaculties.map((faculty) => (
+                  <FacultyCard
+                    key={faculty.faculty_id}
+                    faculty={faculty}
+                    archived
+                    onViewProfile={setSelectedFaculty}
+                    onRestore={restoreTeacher}
+                    canEdit={canEditFaculty}
+                  />
+                ))}
+              </div>
+            )
+          )}
+
+          <ConfirmDialog
+            open={Boolean(pendingTeacherArchive)}
+            title={`Archive Teacher ${pendingTeacherArchive?.name ?? ''}?`}
+            message="This teacher will be moved to Archived Teachers. Existing schedule history will be preserved."
+            confirmLabel="Archive Teacher"
+            tone="warning"
+            onConfirm={confirmArchiveTeacher}
+            onCancel={() => setPendingTeacherArchive(null)}
+          />
         </>
       ) : activeTab === 'bookings' ? (
         canManageBookings && <TeacherBookingsDashboard />

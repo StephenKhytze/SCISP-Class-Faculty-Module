@@ -27,10 +27,20 @@ class CourseController extends Controller
             'name' => 'required|string|max:255',
         ]);
 
-        $course = Course::firstOrCreate(
-            ['education_level' => $data['education_level'], 'code' => $data['code']],
-            ['name' => $data['name']]
-        );
+        // Normalized duplicate guard: "bsit", " BSIT " and "BSIT" are one course, not three.
+        $code = strtoupper(trim(preg_replace('/\s+/', ' ', $data['code'])));
+        $clash = Course::where('education_level', $data['education_level'])
+            ->get()
+            ->first(fn ($c) => strtoupper(trim($c->code)) === $code);
+        if ($clash) {
+            return response()->json(['message' => "{$clash->code} already exists.", 'existing' => $clash], 422);
+        }
+
+        $course = Course::create([
+            'education_level' => $data['education_level'],
+            'code' => $code,
+            'name' => trim(preg_replace('/\s+/', ' ', $data['name'])),
+        ]);
 
         return response()->json($course, 201);
     }

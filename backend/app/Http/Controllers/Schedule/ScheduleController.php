@@ -55,6 +55,7 @@ class ScheduleController extends Controller
     public function store(Request $request)
     {
         $data = $this->validateSchedule($request);
+        $this->assertInstructorIsActive($data['faculty_id']);
 
         $schedule = Schedule::create($data);
 
@@ -64,10 +65,25 @@ class ScheduleController extends Controller
     public function update(Request $request, Schedule $schedule)
     {
         $data = $this->validateSchedule($request);
+        // Keeping an already-archived teacher on an existing class is fine (history); only
+        // choosing a different archived teacher is refused.
+        if ((string) $data['faculty_id'] !== (string) $schedule->faculty_id) {
+            $this->assertInstructorIsActive($data['faculty_id']);
+        }
 
         $schedule->update($data);
 
         return response()->json($schedule->load(['subject', 'faculty']));
+    }
+
+    // Archived teachers can't be newly assigned to a class. Their existing schedules and
+    // names stay readable - this only guards the assignment step.
+    private function assertInstructorIsActive($facultyId): void
+    {
+        $archived = \App\Models\Faculty::whereNotNull('archived_at')->where('faculty_id', $facultyId)->exists();
+        if ($archived) {
+            abort(response()->json(['message' => 'That teacher is archived. Restore them first before assigning a class.'], 422));
+        }
     }
 
     private function validateSchedule(Request $request): array

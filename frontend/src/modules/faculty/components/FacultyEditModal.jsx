@@ -220,7 +220,7 @@ export default function FacultyEditModal({ faculty, onClose, onSaved, selfEdit =
                 <div className="mt-3">
                   <label className="text-[11px] font-semibold text-gray-400 uppercase">Teaching Grades</label>
                   <p className="text-xs text-gray-400 mb-1.5">
-                    Narrows it down further within Basic Ed - leave blank to allow every grade under the levels above.
+                    Narrows it down further within Basic Education - leave blank to allow every grade under the levels above.
                   </p>
                   <div className="flex flex-wrap gap-1.5">
                     {gradeOptions.map((grade) => (

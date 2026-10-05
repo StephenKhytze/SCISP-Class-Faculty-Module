@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { X, Save, Pencil, Building2, Archive, ArchiveRestore, AlertTriangle, Search, Settings2, Plus } from 'lucide-react';
 import api from '../../../services/api';
+import ConfirmDialog from './ConfirmDialog';
 
 const FIELD_DEFAULTS = { room_code: '', room_name: '', building: '', room_type: '' };
 
@@ -18,6 +19,7 @@ export default function ManageRoomsModal({ open, onClose, onChanged }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState('');
+  const [pendingArchive, setPendingArchive] = useState(null);
   const [buildingFilter, setBuildingFilter] = useState('');
 
   // Room Type is its own small managed masterlist (see RoomTypeController) - an admin can
@@ -28,6 +30,7 @@ export default function ManageRoomsModal({ open, onClose, onChanged }) {
   const [newTypeName, setNewTypeName] = useState('');
   const [typeError, setTypeError] = useState(null);
   const [typeSubmitting, setTypeSubmitting] = useState(false);
+  const [pendingTypeAction, setPendingTypeAction] = useState(null);
 
   const loadRoomTypes = () => {
     api.get('/room-types').then((res) => setRoomTypes(res.data)).catch(() => setRoomTypes([]));
@@ -131,8 +134,11 @@ export default function ManageRoomsModal({ open, onClose, onChanged }) {
       .finally(() => setSubmitting(false));
   };
 
-  const handleArchive = (room) => {
-    if (!window.confirm(`Archive ${room.room_code}? It will be hidden here and from Add Schedule, but not deleted.`)) return;
+  // Soft archive: the room row (and every schedule that points at it) is kept; it only moves
+  // from the active list to the archived list.
+  const confirmArchive = () => {
+    const room = pendingArchive;
+    setPendingArchive(null);
     api
       .patch(`/rooms/${room.room_id}/archive`)
       .then((res) => {
@@ -145,7 +151,6 @@ export default function ManageRoomsModal({ open, onClose, onChanged }) {
   };
 
   const handleRestore = (room) => {
-    if (!window.confirm(`Restore ${room.room_code}? It will reappear here and in Add Schedule.`)) return;
     api
       .patch(`/rooms/${room.room_id}/restore`)
       .then((res) => {
@@ -174,8 +179,16 @@ export default function ManageRoomsModal({ open, onClose, onChanged }) {
       .finally(() => setTypeSubmitting(false));
   };
 
-  const handleArchiveType = (type) => {
-    if (!window.confirm(`Archive the "${type.name}" room type? It will be hidden from Add Room, but not deleted.`)) return;
+    const askArchiveType = (type) =>
+    setPendingTypeAction({
+      title: 'Archive Room Type?',
+      message: 'This room type will be archived. Existing room and schedule records will not be deleted.',
+      confirmLabel: 'Archive',
+      tone: 'warning',
+      run: () => archiveType(type),
+    });
+
+  const archiveType = (type) => {
     api
       .patch(`/room-types/${type.room_type_id}/archive`)
       .then((res) => {
@@ -311,7 +324,7 @@ export default function ManageRoomsModal({ open, onClose, onChanged }) {
                       {t.name}
                       <button
                         type="button"
-                        onClick={() => handleArchiveType(t)}
+                        onClick={() => askArchiveType(t)}
                         title="Archive this type"
                         className="text-gray-400 hover:text-amber-600 transition-colors"
                       >
@@ -410,27 +423,45 @@ export default function ManageRoomsModal({ open, onClose, onChanged }) {
               <p className="text-sm text-gray-500">{archivedRooms.length === 0 ? 'No archived rooms.' : 'No archived rooms match your search.'}</p>
             </div>
           ) : (
-            <RoomTable rooms={visibleArchivedRooms} archived onEdit={startEdit} onArchive={handleArchive} onRestore={handleRestore} />
+            <RoomTable rooms={visibleArchivedRooms} archived onEdit={startEdit} onArchive={setPendingArchive} onRestore={handleRestore} />
           )
         ) : loading ? (
           <p className="text-sm text-gray-500">Loading rooms...</p>
         ) : visibleRooms.length === 0 ? (
           <div className="text-center py-6">
             <Building2 className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-            <p className="text-sm text-gray-500">{rooms.length === 0 ? 'No rooms in the masterlist yet.' : 'No rooms match your search.'}</p>
+            <p className="text-sm text-gray-500">{rooms.length === 0 ? 'No rooms available.' : 'No rooms match your search.'}</p>
           </div>
         ) : (
-          <RoomTable rooms={visibleRooms} onEdit={startEdit} onArchive={handleArchive} onRestore={handleRestore} />
+          <RoomTable rooms={visibleRooms} onEdit={startEdit} onArchive={setPendingArchive} onRestore={handleRestore} />
         )}
       </div>
+      <ConfirmDialog
+        open={Boolean(pendingTypeAction)}
+        title={pendingTypeAction?.title}
+        message={pendingTypeAction?.message}
+        confirmLabel={pendingTypeAction?.confirmLabel}
+        tone={pendingTypeAction?.tone ?? 'default'}
+        onConfirm={() => { const a = pendingTypeAction; setPendingTypeAction(null); a.run(); }}
+        onCancel={() => setPendingTypeAction(null)}
+      />
+      <ConfirmDialog
+        open={Boolean(pendingArchive)}
+        title={`Archive Room ${pendingArchive?.room_code ?? ''}?`}
+        message="This room will be moved to Archived Rooms. Existing schedule history will be preserved."
+        confirmLabel="Archive Room"
+        tone="warning"
+        onConfirm={confirmArchive}
+        onCancel={() => setPendingArchive(null)}
+      />
     </div>
   );
 }
 
 function RoomTable({ rooms, archived = false, onEdit, onArchive, onRestore }) {
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
-      <table className="w-full text-sm">
+    <div className="border border-gray-200 rounded-lg overflow-x-auto">
+      <table className="w-full min-w-[480px] text-sm">
         <thead>
           <tr className="bg-gray-50 border-b border-gray-200">
             <th className="text-left text-[10px] font-bold text-gray-500 uppercase px-3 py-2">Building</th>

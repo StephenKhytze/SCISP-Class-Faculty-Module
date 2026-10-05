@@ -10,13 +10,14 @@ import AddCourseModal from './components/AddCourseModal';
 import AddClassSectionModal from './components/AddClassSectionModal';
 import ManageSubjectsModal from './components/ManageSubjectsModal';
 import ManageRoomsModal from './components/ManageRoomsModal';
-import { SCHEDULE_DAYS, TIME_SLOTS, EDUCATION_LEVELS, BASIC_ED_YEAR_GROUPS, STRANDS, isSeniorHigh, slotsSpannedBy, currentDayName, currentTimeHHMM, compactHour } from './constants';
+import ConfirmDialog from './components/ConfirmDialog';
+import { displayEducationLevel, SCHEDULE_DAYS, TIME_SLOTS, EDUCATION_LEVELS, BASIC_ED_YEAR_GROUPS, STRANDS, isSeniorHigh, slotsSpannedBy, currentDayName, currentTimeHHMM, compactHour } from './constants';
 
 const EDUCATION_LEVEL_ICONS = { College: Landmark, Masteral: GraduationCap, 'Basic Ed': School };
 const EDUCATION_LEVEL_DESCRIPTIONS = {
   College: 'View every College class by course, year level, and section',
   Masteral: 'View every Masteral class by graduate program, year level, and section',
-  'Basic Ed': 'View every Basic Ed class by grade level and section',
+  'Basic Ed': 'View every Basic Education class by grade level and section',
 };
 
 const EMPTY_FILTERS = {
@@ -50,6 +51,11 @@ export default function ScheduleView() {
   const [addingStrand, setAddingStrand] = useState(false);
   const [managingSubjects, setManagingSubjects] = useState(false);
   const [managingRooms, setManagingRooms] = useState(false);
+  const [pendingSectionArchive, setPendingSectionArchive] = useState(null);
+  const [pendingStrandArchive, setPendingStrandArchive] = useState(null);
+  const [teacherSearch, setTeacherSearch] = useState('');
+  const [pendingEntryAction, setPendingEntryAction] = useState(null);
+  const [showArchivedSections, setShowArchivedSections] = useState(false);
 
   const currentUser = useMemo(() => {
     try {
@@ -173,39 +179,79 @@ export default function ScheduleView() {
   // grade. Archiving/restoring a strand is tracked as a placeholder class_sections row
   // (education_level/level_label/year_label/strand, no section_name) rather than a real
   // section, so it never touches an actual class section sharing the same strand name.
-  const archivedStrandNames = useMemo(() => {
-    return new Set(
-      archivedClassSections
-        .filter(
-          (s) =>
-            s.education_level === 'Basic Ed' && s.level_label === basicEdLevel && s.year_label === pendingGrade && s.strand && !s.section_name
-        )
-        .map((s) => s.strand)
+  // Strand rows (no section_name) for the grade being browsed - active ones and archived ones.
+  // There is no fixed cap: any strand an admin adds is a row here, and the fixed STRANDS list
+  // is just the default suggestion set. Archiving only hides that one strand from this list.
+  const isStrandRowInGrade = (s) =>
+    s.education_level === 'Basic Ed' && s.level_label === basicEdLevel && s.year_label === pendingGrade && s.strand && !s.section_name;
+
+  const activeStrandRows = useMemo(
+    () => classSections.filter(isStrandRowInGrade),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- isStrandRowInGrade reads the grade values listed below
+    [classSections, basicEdLevel, pendingGrade]
+  );
+
+  const archivedStrandRows = useMemo(
+    () => archivedClassSections.filter(isStrandRowInGrade).sort((a, b) => a.strand.localeCompare(b.strand)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- isStrandRowInGrade reads the grade values listed below
+    [archivedClassSections, basicEdLevel, pendingGrade]
+  );
+
+  // Strands shown in the picker: the defaults plus every active custom strand in this grade,
+  // minus any name that only exists archived. Deduplicated case-insensitively.
+  const visibleStrands = useMemo(() => {
+    const activeNames = activeStrandRows.map((s) => s.strand.trim());
+    const archivedOnly = new Set(
+      archivedStrandRows
+        .filter((a) => !activeNames.some((n) => n.toLowerCase() === a.strand.trim().toLowerCase()))
+        .map((a) => a.strand.trim().toLowerCase())
     );
-  }, [archivedClassSections, basicEdLevel, pendingGrade]);
-
-  const visibleStrands = useMemo(() => STRANDS.filter((s) => !archivedStrandNames.has(s)), [archivedStrandNames]);
-
-  // Sections available for whatever scope has been narrowed down so far - always offers
-  // an "All Sections" fallback so records saved without a section stay reachable. Kept as
-  // the actual row (not just the name) so each can be archived individually.
-  const sectionsInScope = useMemo(() => {
-    const matches = classSections.filter((s) => {
-      if (!s.section_name) return false;
-      if (s.education_level !== educationCategory) return false;
-      if (educationCategory === 'Basic Ed') {
-        if (s.level_label !== basicEdLevel || s.year_label !== pendingGrade) return false;
-        if (isSeniorHigh(pendingGrade) && s.strand !== pendingStrand) return false;
-        return true;
-      }
-      return s.course_id === pendingCourseId && s.year_label === pendingGrade;
+    const seen = new Set();
+    return [...STRANDS, ...activeNames].filter((name) => {
+      const key = name.toLowerCase();
+      if (seen.has(key) || archivedOnly.has(key)) return false;
+      seen.add(key);
+      return true;
     });
+  }, [activeStrandRows, archivedStrandRows]);
+
+  // Teacher picker search: matches name, department, or position, case-insensitively.
+  const filteredTeachers = useMemo(() => {
+    const q = teacherSearch.trim().toLowerCase();
+    if (!q) return faculties;
+    return faculties.filter((f) =>
+      [f.name, f.department, f.position].some((v) => (v || '').toLowerCase().includes(q))
+    );
+  }, [faculties, teacherSearch]);
+
+  // Whether a section row belongs to the year level / course / strand currently being browsed.
+  const isSectionInScope = (s) => {
+    if (!s.section_name) return false;
+    if (s.education_level !== educationCategory) return false;
+    if (educationCategory === 'Basic Ed') {
+      if (s.level_label !== basicEdLevel || s.year_label !== pendingGrade) return false;
+      if (isSeniorHigh(pendingGrade) && s.strand !== pendingStrand) return false;
+      return true;
+    }
+    return s.course_id === pendingCourseId && s.year_label === pendingGrade;
+  };
+
+  // Sections available for the scope being browsed. Kept as the actual row (not just the
+  // name) so each can be archived or restored individually.
+  const sectionsInScope = useMemo(() => {
     const byName = new Map();
-    matches.forEach((s) => {
+    classSections.filter(isSectionInScope).forEach((s) => {
       if (!byName.has(s.section_name)) byName.set(s.section_name, s);
     });
     return [...byName.values()].sort((a, b) => a.section_name.localeCompare(b.section_name));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- isSectionInScope reads the scope values listed below
   }, [classSections, educationCategory, basicEdLevel, pendingGrade, pendingStrand, pendingCourseId]);
+
+  const archivedSectionsInScope = useMemo(
+    () => archivedClassSections.filter(isSectionInScope).sort((a, b) => a.section_name.localeCompare(b.section_name)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- isSectionInScope reads the scope values listed below
+    [archivedClassSections, educationCategory, basicEdLevel, pendingGrade, pendingStrand, pendingCourseId]
+  );
 
   // Three distinct conflict scopes, checked separately:
   //  - Faculty overlap: same teacher, two classes at once - an admin/faculty problem.
@@ -345,34 +391,71 @@ export default function ScheduleView() {
         : [...prev, saved]
     );
 
-  const handleArchive = (entry) => {
-    if (!window.confirm(`Archive ${entry.subject_code} on ${entry.day}? It will be hidden from the schedule, but not deleted.`)) return;
+  // Archive/restore of a single class entry go through the shared dialog first.
+  const askArchiveEntry = (entry) =>
+    setPendingEntryAction({
+      title: 'Archive Schedule Entry?',
+      message: 'This schedule entry will be archived and removed from the active timetable.',
+      confirmLabel: 'Archive',
+      tone: 'warning',
+      run: () => archiveEntry(entry),
+    });
+
+  const archiveEntry = (entry) => {
     api
       .patch(`/schedule/${entry.schedule_id}/archive`)
       .then(() => setSchedules((prev) => prev.filter((s) => s.schedule_id !== entry.schedule_id)))
       .catch(() => setError('Unable to archive that class.'));
   };
 
-  const handleRestore = (entry) => {
-    if (!window.confirm(`Restore ${entry.subject_code} on ${entry.day}? It will reappear in the active schedule.`)) return;
+  const askRestoreEntry = (entry) =>
+    setPendingEntryAction({
+      title: 'Restore Schedule Entry?',
+      message: 'This schedule entry will reappear in the active timetable.',
+      confirmLabel: 'Restore',
+      run: () => restoreEntry(entry),
+    });
+
+  const restoreEntry = (entry) => {
     api
       .patch(`/schedule/${entry.schedule_id}/restore`)
       .then(() => setSchedules((prev) => prev.filter((s) => s.schedule_id !== entry.schedule_id)))
       .catch(() => setError('Unable to restore that class.'));
   };
 
-  const handleArchiveSection = (section, e) => {
-    e.stopPropagation();
-    if (!window.confirm(`Archive Section ${section.section_name}? It will be hidden from this picker, but not deleted.`)) return;
+  // Soft archive: the row stays in class_sections (archived_at is set), so its schedules and
+  // history remain intact. It moves from the active list to the archived list in state.
+  const confirmArchiveSection = () => {
+    const section = pendingSectionArchive;
+    setPendingSectionArchive(null);
     api
       .patch(`/class-sections/${section.class_section_id}/archive`)
-      .then(() => setClassSections((prev) => prev.filter((s) => s.class_section_id !== section.class_section_id)))
+      .then((res) => {
+        setClassSections((prev) => prev.filter((s) => s.class_section_id !== section.class_section_id));
+        setArchivedClassSections((prev) => [...prev.filter((s) => s.class_section_id !== section.class_section_id), res.data]);
+      })
       .catch(() => setError('Unable to archive that section.'));
   };
 
+  const restoreSection = (section) => {
+    api
+      .patch(`/class-sections/${section.class_section_id}/restore`)
+      .then((res) => {
+        setArchivedClassSections((prev) => prev.filter((s) => s.class_section_id !== section.class_section_id));
+        setClassSections((prev) => [...prev.filter((s) => s.class_section_id !== section.class_section_id), res.data]);
+      })
+      .catch(() => setError('Unable to restore that section.'));
+  };
+
+  // Opens the shared confirmation; the actual archive runs from confirmArchiveStrand.
   const handleArchiveStrand = (strandName, e) => {
     e.stopPropagation();
-    if (!window.confirm(`Archive the ${strandName} strand for ${pendingGrade}? It will be hidden from this picker, but not deleted.`)) return;
+    setPendingStrandArchive(strandName);
+  };
+
+  const confirmArchiveStrand = () => {
+    const strandName = pendingStrandArchive;
+    setPendingStrandArchive(null);
     // The strand may not have a class_sections row yet at all (it's shown by default from
     // the fixed list) - register a placeholder for it first if needed, then archive that.
     const placeholder = classSections.find(
@@ -532,7 +615,7 @@ export default function ScheduleView() {
       ? faculties.find((f) => String(f.faculty_id) === String(filters.facultyId))?.name
       : category === 'class'
       ? [
-          filters.educationLevel,
+          displayEducationLevel(filters.educationLevel),
           filters.educationLevel === 'Basic Ed' ? basicEdLevel : null,
           filters.educationLevel === 'Basic Ed' ? null : filters.level,
           filters.year,
@@ -739,7 +822,7 @@ export default function ScheduleView() {
               <BrowseCard
                 key={lvl}
                 icon={EDUCATION_LEVEL_ICONS[lvl]}
-                title={lvl}
+                title={displayEducationLevel(lvl)}
                 description={EDUCATION_LEVEL_DESCRIPTIONS[lvl]}
                 onClick={() => openClassFlow(lvl)}
               />
@@ -760,7 +843,7 @@ export default function ScheduleView() {
             <ArrowLeft className="w-3.5 h-3.5" />
             Back to Browse Options
           </button>
-          <h3 className="text-sm font-bold text-gray-900 mb-3">Select a Level under Basic Ed</h3>
+          <h3 className="text-sm font-bold text-gray-900 mb-3">Select a Level under Basic Education</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 max-w-2xl">
             {Object.entries(BASIC_ED_YEAR_GROUPS).map(([group, grades]) => (
               <button
@@ -816,6 +899,9 @@ export default function ScheduleView() {
             )}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+            {visibleStrands.length === 0 && (
+              <p className="text-sm text-gray-500 col-span-full">No strands have been added yet.</p>
+            )}
             {visibleStrands.map((s) => (
               <div
                 key={s}
@@ -840,6 +926,42 @@ export default function ScheduleView() {
               </div>
             ))}
           </div>
+
+          {isAdmin && (
+            <div className="mt-5 pt-4 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={() => setShowArchivedSections((v) => !v)}
+                className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-700"
+              >
+                <Archive className="w-3.5 h-3.5" />
+                {showArchivedSections ? 'Hide' : 'Show'} archived strands ({archivedStrandRows.length})
+              </button>
+              {showArchivedSections && archivedStrandRows.length === 0 && (
+                <p className="text-xs text-gray-500 mt-3">No archived strands.</p>
+              )}
+              {showArchivedSections && archivedStrandRows.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 mt-3">
+                  {archivedStrandRows.map((row) => (
+                    <div
+                      key={row.class_section_id}
+                      className="flex items-center justify-between gap-2 border border-dashed border-gray-300 bg-gray-50 rounded-lg px-3 py-2.5"
+                    >
+                      <p className="text-sm font-semibold text-gray-500 truncate">{row.strand}</p>
+                      <button
+                        type="button"
+                        onClick={() => restoreSection(row)}
+                        className="flex items-center gap-1 text-xs font-semibold text-[#80172B] hover:underline shrink-0"
+                      >
+                        <ArchiveRestore className="w-3.5 h-3.5" />
+                        Restore
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -933,38 +1055,71 @@ export default function ScheduleView() {
               </button>
             )}
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
-            {sectionsInScope.map((section) => (
-              <div
-                key={section.class_section_id}
-                className="relative flex items-center border border-gray-200 rounded-lg hover:border-[#80172B] hover:bg-[#80172B]/5 transition-colors"
-              >
-                <button
-                  onClick={() => pickSectionStep(section.section_name)}
-                  className="flex-1 text-left px-3 py-2.5"
+          {sectionsInScope.length === 0 ? (
+            <p className="text-sm text-gray-500 py-6 text-center">No sections have been added to this year level yet.</p>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
+              {sectionsInScope.map((section) => (
+                <div
+                  key={section.class_section_id}
+                  className="relative flex items-center border border-gray-200 rounded-lg hover:border-[#80172B] hover:bg-[#80172B]/5 transition-colors"
                 >
-                  <p className="text-sm font-semibold text-gray-900">Section {section.section_name}</p>
-                </button>
-                {isAdmin && (
                   <button
-                    type="button"
-                    onClick={(e) => handleArchiveSection(section, e)}
-                    title="Archive this section"
-                    className="text-gray-300 hover:text-amber-600 transition-colors pr-3 shrink-0"
+                    onClick={() => pickSectionStep(section.section_name)}
+                    className="flex-1 min-w-0 text-left px-3 py-2.5"
                   >
-                    <Archive className="w-3.5 h-3.5" />
+                    <p className="text-sm font-semibold text-gray-900 truncate">Section {section.section_name}</p>
                   </button>
-                )}
-              </div>
-            ))}
-            <button
-              onClick={() => pickSectionStep('')}
-              className="text-left px-3 py-2.5 border border-dashed border-gray-300 rounded-lg hover:border-[#80172B] hover:bg-[#80172B]/5 transition-colors"
-            >
-              <p className="text-sm font-semibold text-gray-900">All Sections</p>
-              <p className="text-xs text-gray-500 mt-0.5">Classes not assigned to a specific section</p>
-            </button>
-          </div>
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => setPendingSectionArchive(section)}
+                      title="Archive this section"
+                      className="text-gray-300 hover:text-amber-600 transition-colors pr-3 shrink-0"
+                    >
+                      <Archive className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {isAdmin && (
+            <div className="mt-5 pt-4 border-t border-gray-200">
+              <button
+                type="button"
+                onClick={() => setShowArchivedSections((v) => !v)}
+                className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-700"
+              >
+                <Archive className="w-3.5 h-3.5" />
+                {showArchivedSections ? 'Hide' : 'Show'} archived sections ({archivedSectionsInScope.length})
+              </button>
+              {showArchivedSections && archivedSectionsInScope.length === 0 && (
+                <p className="text-xs text-gray-500 mt-3">No archived sections.</p>
+              )}
+              {showArchivedSections && archivedSectionsInScope.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 mt-3">
+                  {archivedSectionsInScope.map((section) => (
+                    <div
+                      key={section.class_section_id}
+                      className="flex items-center justify-between gap-2 border border-dashed border-gray-300 bg-gray-50 rounded-lg px-3 py-2.5"
+                    >
+                      <p className="text-sm font-semibold text-gray-500 truncate">Section {section.section_name}</p>
+                      <button
+                        type="button"
+                        onClick={() => restoreSection(section)}
+                        className="flex items-center gap-1 text-xs font-semibold text-[#80172B] hover:underline shrink-0"
+                      >
+                        <ArchiveRestore className="w-3.5 h-3.5" />
+                        Restore
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -974,12 +1129,25 @@ export default function ScheduleView() {
             <ArrowLeft className="w-3.5 h-3.5" />
             Back to Browse Options
           </button>
-          <h3 className="text-sm font-bold text-gray-900 mb-3">Select a Teacher</h3>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+            <h3 className="text-sm font-bold text-gray-900">Select a Teacher</h3>
+            <div className="relative w-full sm:w-64">
+              <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                value={teacherSearch}
+                onChange={(e) => setTeacherSearch(e.target.value)}
+                placeholder="Search name, department, or position..."
+                className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#80172B]/30"
+              />
+            </div>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2">
             {faculties.length === 0 ? (
-              <p className="text-sm text-gray-500 col-span-full">No faculty records found.</p>
+              <p className="text-sm text-gray-500 col-span-full">No active teachers.</p>
+            ) : filteredTeachers.length === 0 ? (
+              <p className="text-sm text-gray-500 col-span-full">No teachers match &ldquo;{teacherSearch.trim()}&rdquo;.</p>
             ) : (
-              faculties.map((f) => (
+              filteredTeachers.map((f) => (
                 <button
                   key={f.faculty_id}
                   onClick={() => pickTeacherStep(f.faculty_id)}
@@ -1093,7 +1261,7 @@ export default function ScheduleView() {
                           </p>
                         </div>
                         <button
-                          onClick={() => handleRestore(entry)}
+                          onClick={() => askRestoreEntry(entry)}
                           className="flex items-center justify-center gap-1.5 shrink-0 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-emerald-100 transition-colors"
                         >
                           <ArchiveRestore className="w-3.5 h-3.5" />
@@ -1103,9 +1271,17 @@ export default function ScheduleView() {
                     ))
                 )}
               </div>
+            ) : visibleDays.length === 1 && !filteredSchedules.some((entry) => entry.day === visibleDays[0]) ? (
+              <p className="text-sm text-gray-500 text-center py-10">No classes scheduled for this day.</p>
             ) : (
               <div className="overflow-x-auto print:overflow-visible">
-                <table className="w-full border-collapse table-auto sm:table-fixed print:table-auto">
+                {/* Day columns keep the same fixed width whether one day or the full week is shown,
+                    so a subject card never changes size when a day filter is applied. */}
+                <table
+                  className={`border-collapse table-auto sm:table-fixed print:table-auto print:w-full ${
+                    visibleDays.length === 1 ? 'sm:w-auto' : 'w-full'
+                  }`}
+                >
                   <thead>
                     <tr className="border-b border-gray-200 print:bg-[#182848]">
                       <th className="text-left text-[9px] sm:text-xs font-bold text-gray-500 uppercase p-0.5 sm:p-3 w-8 sm:w-28 print:w-auto print:text-white">
@@ -1140,7 +1316,7 @@ export default function ScheduleView() {
                                 onSelectEntry={setSelectedClassEntry}
                                 isAdmin={isAdmin}
                                 onEdit={setEditingSchedule}
-                                onArchive={handleArchive}
+                                onArchive={askArchiveEntry}
                               />
                             </td>
                           );
@@ -1193,6 +1369,7 @@ export default function ScheduleView() {
         open={addingYearLevel}
         mode="year"
         context={{ education_level: educationCategory, course_id: pendingCourseId }}
+        existingValues={yearsForPendingProgram}
         onClose={() => setAddingYearLevel(false)}
         onSaved={(section) => setClassSections((prev) => [...prev, section])}
       />
@@ -1200,16 +1377,19 @@ export default function ScheduleView() {
         open={addingStrand}
         mode="strand"
         context={{ education_level: 'Basic Ed', level_label: basicEdLevel, year_label: pendingGrade }}
-        strandOptions={[...archivedStrandNames]}
+        existingValues={visibleStrands}
+        archivedValues={archivedStrandRows.map((r) => r.strand)}
         onClose={() => setAddingStrand(false)}
-        onSaved={(section) => {
-          setClassSections((prev) => [...prev, section]);
-          setArchivedClassSections((prev) => prev.filter((s) => s.class_section_id !== section.class_section_id));
+        onSaved={(row) => {
+          setClassSections((prev) => [...prev.filter((s) => s.class_section_id !== row.class_section_id), row]);
+          setArchivedClassSections((prev) => prev.filter((s) => s.class_section_id !== row.class_section_id));
         }}
       />
       <AddClassSectionModal
         open={addingSection}
         mode="section"
+        existingValues={sectionsInScope.map((sec) => sec.section_name)}
+        archivedValues={archivedSectionsInScope.map((sec) => sec.section_name)}
         context={
           educationCategory === 'Basic Ed'
             ? { education_level: 'Basic Ed', level_label: basicEdLevel, year_label: pendingGrade, strand: pendingStrand || null }
@@ -1228,6 +1408,33 @@ export default function ScheduleView() {
         open={managingRooms}
         onClose={() => setManagingRooms(false)}
         onChanged={() => api.get('/rooms').then((res) => setRooms(res.data)).catch(() => {})}
+      />
+      <ConfirmDialog
+        open={Boolean(pendingEntryAction)}
+        title={pendingEntryAction?.title}
+        message={pendingEntryAction?.message}
+        confirmLabel={pendingEntryAction?.confirmLabel}
+        tone={pendingEntryAction?.tone ?? 'default'}
+        onConfirm={() => { const a = pendingEntryAction; setPendingEntryAction(null); a.run(); }}
+        onCancel={() => setPendingEntryAction(null)}
+      />
+      <ConfirmDialog
+        open={Boolean(pendingStrandArchive)}
+        title={`Archive ${pendingStrandArchive ?? ''} strand?`}
+        message={`This strand will be moved to Archived Strands for ${pendingGrade}. Existing records and schedule history will be preserved.`}
+        confirmLabel="Archive Strand"
+        tone="warning"
+        onConfirm={confirmArchiveStrand}
+        onCancel={() => setPendingStrandArchive(null)}
+      />
+      <ConfirmDialog
+        open={Boolean(pendingSectionArchive)}
+        title={`Archive Section ${pendingSectionArchive?.section_name ?? ''}?`}
+        message="This section will be moved to Archived Sections. Existing records and schedule history will be preserved."
+        confirmLabel="Archive Section"
+        tone="warning"
+        onConfirm={confirmArchiveSection}
+        onCancel={() => setPendingSectionArchive(null)}
       />
     </div>
   );

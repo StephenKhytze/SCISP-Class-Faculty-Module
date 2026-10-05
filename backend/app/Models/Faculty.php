@@ -30,12 +30,14 @@ class Faculty extends Model
         'teaching_grades',
         'availability_status',
         'status_detail',
+        'archived_at',
     ];
 
     protected $casts = [
         'specializations' => 'array',
         'teaching_levels' => 'array',
         'teaching_grades' => 'array',
+        'archived_at' => 'datetime',
     ];
 
     public function getNameAttribute(): string
