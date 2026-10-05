@@ -18,4 +18,18 @@ api.interceptors.request.use((config) => {
   return Promise.reject(error);
 });
 
+// A 401 on any call other than login means the token is missing, invalid or expired
+// (tokens last 1 hour) - clear the stale session and send the user back to log in.
+api.interceptors.response.use((response) => response, (error) => {
+  const isLoginRequest = error.config?.url?.includes('/auth/login');
+  if (error.response?.status === 401 && !isLoginRequest) {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('user');
+    if (window.location.pathname !== '/auth') {
+      window.location.assign('/auth');
+    }
+  }
+  return Promise.reject(error);
+});
+
 export default api;

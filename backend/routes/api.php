@@ -48,46 +48,46 @@ Route::middleware('auth.jwt')->group(function () {
     */
     Route::prefix('schedule')->group(function () {
         Route::get('/', [ScheduleController::class, 'index']);
-        Route::post('/', [ScheduleController::class, 'store']);
-        Route::put('/{schedule}', [ScheduleController::class, 'update']);
-        Route::patch('/{schedule}/archive', [ScheduleController::class, 'archive']);
-        Route::patch('/{schedule}/restore', [ScheduleController::class, 'restore']);
+        Route::post('/', [ScheduleController::class, 'store'])->middleware('admin');
+        Route::put('/{schedule}', [ScheduleController::class, 'update'])->middleware('admin');
+        Route::patch('/{schedule}/archive', [ScheduleController::class, 'archive'])->middleware('admin');
+        Route::patch('/{schedule}/restore', [ScheduleController::class, 'restore'])->middleware('admin');
         // Group 2: Add more schedule routes here
     });
 
     Route::prefix('courses')->group(function () {
         Route::get('/', [CourseController::class, 'index']);
-        Route::post('/', [CourseController::class, 'store']);
+        Route::post('/', [CourseController::class, 'store'])->middleware('admin');
     });
 
     Route::prefix('class-sections')->group(function () {
         Route::get('/', [ClassSectionController::class, 'index']);
-        Route::post('/', [ClassSectionController::class, 'store']);
-        Route::patch('/{classSection}/archive', [ClassSectionController::class, 'archive']);
-        Route::patch('/{classSection}/restore', [ClassSectionController::class, 'restore']);
+        Route::post('/', [ClassSectionController::class, 'store'])->middleware('admin');
+        Route::patch('/{classSection}/archive', [ClassSectionController::class, 'archive'])->middleware('admin');
+        Route::patch('/{classSection}/restore', [ClassSectionController::class, 'restore'])->middleware('admin');
     });
 
     Route::prefix('subjects')->group(function () {
         Route::get('/', [SubjectController::class, 'index']);
-        Route::post('/', [SubjectController::class, 'store']);
-        Route::put('/{subject}', [SubjectController::class, 'update']);
-        Route::patch('/{subject}/archive', [SubjectController::class, 'archive']);
-        Route::patch('/{subject}/restore', [SubjectController::class, 'restore']);
+        Route::post('/', [SubjectController::class, 'store'])->middleware('admin');
+        Route::put('/{subject}', [SubjectController::class, 'update'])->middleware('admin');
+        Route::patch('/{subject}/archive', [SubjectController::class, 'archive'])->middleware('admin');
+        Route::patch('/{subject}/restore', [SubjectController::class, 'restore'])->middleware('admin');
     });
 
     Route::prefix('rooms')->group(function () {
         Route::get('/', [RoomController::class, 'index']);
-        Route::post('/', [RoomController::class, 'store']);
-        Route::put('/{room}', [RoomController::class, 'update']);
-        Route::patch('/{room}/archive', [RoomController::class, 'archive']);
-        Route::patch('/{room}/restore', [RoomController::class, 'restore']);
+        Route::post('/', [RoomController::class, 'store'])->middleware('admin');
+        Route::put('/{room}', [RoomController::class, 'update'])->middleware('admin');
+        Route::patch('/{room}/archive', [RoomController::class, 'archive'])->middleware('admin');
+        Route::patch('/{room}/restore', [RoomController::class, 'restore'])->middleware('admin');
     });
 
     Route::prefix('room-types')->group(function () {
         Route::get('/', [RoomTypeController::class, 'index']);
-        Route::post('/', [RoomTypeController::class, 'store']);
-        Route::patch('/{roomType}/archive', [RoomTypeController::class, 'archive']);
-        Route::patch('/{roomType}/restore', [RoomTypeController::class, 'restore']);
+        Route::post('/', [RoomTypeController::class, 'store'])->middleware('admin');
+        Route::patch('/{roomType}/archive', [RoomTypeController::class, 'archive'])->middleware('admin');
+        Route::patch('/{roomType}/restore', [RoomTypeController::class, 'restore'])->middleware('admin');
     });
 
     /*
@@ -122,7 +122,7 @@ Route::middleware('auth.jwt')->group(function () {
 
     Route::prefix('faculty')->group(function () {
         Route::get('/', [FacultyController::class, 'index']);
-        Route::post('/', [FacultyController::class, 'store']);
+        Route::post('/', [FacultyController::class, 'store'])->middleware('admin');
         Route::get('/me', [FacultyController::class, 'me']);
         Route::get('/{faculty}', [FacultyController::class, 'show']);
         Route::put('/{faculty}', [FacultyController::class, 'update']);
@@ -131,7 +131,7 @@ Route::middleware('auth.jwt')->group(function () {
         // Group 5: Add more faculty routes here
     });
 
-    Route::get('/consultations', [ConsultationController::class, 'all']);
+    Route::get('/consultations', [ConsultationController::class, 'all'])->middleware('admin');
     Route::get('/consultations/me', [ConsultationController::class, 'mine']);
     Route::patch('/consultations/{consultation}', [ConsultationController::class, 'updateStatus']);
 

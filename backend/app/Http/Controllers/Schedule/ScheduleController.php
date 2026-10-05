@@ -85,9 +85,12 @@ class ScheduleController extends Controller
             'year' => 'nullable|string',
             'strand' => 'nullable|string',
             'section' => 'nullable|string',
-            'day' => 'required|string',
-            'start_time' => 'required',
-            'end_time' => 'required',
+            // Matches SCHEDULE_DAYS on the frontend (schedule/constants.js).
+            'day' => 'required|in:Monday,Tuesday,Wednesday,Thursday,Friday,Saturday,Sunday',
+            'start_time' => 'required|date_format:H:i,H:i:s',
+            'end_time' => 'required|date_format:H:i,H:i:s|after:start_time',
+        ], [
+            'end_time.after' => 'The end time must be later than the start time.',
         ]);
 
         // The client only ever sends room_id now (picked from the Room combobox) - the

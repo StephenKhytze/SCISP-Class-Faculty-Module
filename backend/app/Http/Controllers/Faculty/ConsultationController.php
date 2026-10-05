@@ -67,6 +67,13 @@ class ConsultationController extends Controller
 
     public function updateStatus(Request $request, Consultation $consultation)
     {
+        // Only an admin or the teacher the consultation was booked with may change its status.
+        $user = $request->user();
+        $ownsBooking = (int) $consultation->faculty()->value('user_id') === (int) $user->user_id;
+        if (! $user->isAdmin() && ! $ownsBooking) {
+            return response()->json(['message' => 'You can only update consultations booked with you.'], 403);
+        }
+
         $data = $request->validate([
             'status' => 'required|in:pending,approved,declined,completed',
         ]);

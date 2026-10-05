@@ -22,7 +22,12 @@ export default function TeacherBookingsDashboard() {
     api
       .get('/faculty/me')
       .then((res) => res.data)
-      .catch(() => api.get('/faculty').then((res) => res.data.find((f) => f.user_id) ?? null))
+      // 404 = this account has no linked faculty profile. Never fall back to another
+      // teacher's profile - that would show their bookings and schedule to this user.
+      .catch((err) => {
+        if (err.response?.status === 404) return null;
+        throw err;
+      })
       .then((facultyData) => {
         setFaculty(facultyData);
         if (!facultyData) return null;

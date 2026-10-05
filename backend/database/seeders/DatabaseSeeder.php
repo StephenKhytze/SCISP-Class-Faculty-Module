@@ -32,6 +32,14 @@ class DatabaseSeeder extends Seeder
             'status' => 'active',
         ]);
 
+        // Teacher login - linked to Prof. Maria Santos's faculty record below (by email).
+        $mariaUser = User::factory()->create([
+            'username' => 'Prof._Maria_Santos',
+            'password' => \Illuminate\Support\Facades\Hash::make('secretpassword123'),
+            'role' => 'faculty',
+            'status' => 'active',
+        ]);
+
         $faculties = [
             [
                 'first_name' => 'Dr. Alejandro',
@@ -126,7 +134,10 @@ class DatabaseSeeder extends Seeder
         ];
 
         foreach ($faculties as $faculty) {
-            Faculty::create($faculty);
+            $record = Faculty::create($faculty);
+            if ($faculty['email_address'] === 'm.santos@abcschool.edu.ph') {
+                $record->update(['user_id' => $mariaUser->user_id]);
+            }
         }
 
         $facultyIdByEmail = Faculty::all()->pluck('faculty_id', 'email_address');

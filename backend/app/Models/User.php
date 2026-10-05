@@ -49,4 +49,15 @@ class User extends Authenticatable implements PasskeyUser
             'two_factor_confirmed_at' => 'datetime',
         ];
     }
+
+    // Admin_User_00001 is the seeded demo admin that AuthController also special-cases.
+    public function isAdmin(): bool
+    {
+        return $this->role === 'administrator' || $this->username === 'Admin_User_00001';
+    }
+
+    public function faculty()
+    {
+        return $this->hasOne(Faculty::class, 'user_id', 'user_id');
+    }
 }

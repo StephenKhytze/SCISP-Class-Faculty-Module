@@ -11,7 +11,7 @@ class LeaveRequestController extends Controller
 {
     public function index(Request $request)
     {
-        if (! $this->isAdmin($request)) {
+        if (! $request->user()->isAdmin()) {
             return response()->json(['message' => 'Only administrators can view all leave requests.'], 403);
         }
 
@@ -79,7 +79,7 @@ class LeaveRequestController extends Controller
 
     public function review(Request $request, LeaveRequest $leaveRequest)
     {
-        if (! $this->isAdmin($request)) {
+        if (! $request->user()->isAdmin()) {
             return response()->json(['message' => 'Only administrators can review leave requests.'], 403);
         }
 
@@ -100,12 +100,5 @@ class LeaveRequestController extends Controller
     private function linkedFaculty(Request $request): ?Faculty
     {
         return Faculty::where('user_id', $request->user()->user_id)->first();
-    }
-
-    private function isAdmin(Request $request): bool
-    {
-        $user = $request->user();
-
-        return $user->role === 'administrator' || $user->username === 'Admin_User_00001';
     }
 }

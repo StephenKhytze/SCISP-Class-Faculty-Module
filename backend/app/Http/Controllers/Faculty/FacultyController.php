@@ -79,6 +79,12 @@ class FacultyController extends Controller
 
     public function update(Request $request, Faculty $faculty)
     {
+        // Admins edit anyone; a teacher may only edit the profile linked to their own account.
+        $user = $request->user();
+        if (! $user->isAdmin() && (int) $faculty->user_id !== (int) $user->user_id) {
+            return response()->json(['message' => 'You can only edit your own faculty profile.'], 403);
+        }
+
         $data = $request->validate([
             'first_name' => 'required|string',
             'middle_name' => 'nullable|string',
